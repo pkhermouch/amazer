@@ -1,0 +1,19 @@
+Due date: Sunday 9/14/2014 @11:59pm
+
+Objective: Work on your Verilog and design skills
+
+Assignment: Edit clock.v and add the following functionality:
+
+- Show the elapsed time since your design was loaded
+    * HEX3:HEX2 display minutes in decimal
+    * HEX1:HEX0 display seconds in decimal
+
+- KEY0 sets the elapsed time to 0000
+
+- KEY1 freezes the display at the current time. Counting continues while
+  the key is depressed and the correct time is shown when the key is released
+
+- KEY2 runs the time at 10x speed (the seconds advance once every 1/10 of a
+  second)
+
+- KEY3 sets the elapsed time to 5900
