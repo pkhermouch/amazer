@@ -24,6 +24,7 @@ module clock(
 	 reg[3:0] IN3;
 	 reg[3:0] IN4;
 	 
+	 wire[3:0] SLOWSTATE;
 	 wire[3:0] STATE1;
 	 wire[3:0] STATE2;
 	 wire[3:0] STATE3;
@@ -36,17 +37,13 @@ module clock(
 	 
 	 wire SECONDS0;
 	 wire SECONDS1;
+	 wire SLOWER;
+	 reg SPEED;
 	 
 	 wire MINUTES0;
 	 wire MINUTES1;
 	 
 	 wire IGNORE;
-	 /**
-	 display d0 (STATE0[19:16], HEX0);
-	 display d1 (STATE0[23:20], HEX1);
-	 display d2 (STATE0[27:24], HEX2);
-	 display d3 (STATE0[31:28], HEX3);
-	 **/
 	 
 	 display d0 (DISP0, HEX0);
 	 display d1 (DISP1, HEX1);
@@ -54,11 +51,13 @@ module clock(
 	 display d3 (DISP3, HEX3);
 	 
 	 
-	 clockDivider #(50000000,31) clk0 (CLK, 1'b1, 1'b0, 32'b0, STATE0, SECONDS0); 
-	 clockDivider #(9,3)   clk1 (CLK, SECONDS0, ENABLE, IN1, STATE1, SECONDS1); 
+	 clockDivider #(5000000,31) clk0 (CLK, 1'b1, 1'b0, 32'b0, STATE0, SECONDS0); 
+	 clockDivider #(9,3)   clk1 (CLK, SPEED, ENABLE, IN1, STATE1, SECONDS1); 
 	 clockDivider #(5,3)   clk2 (CLK, SECONDS1, ENABLE, IN2, STATE2, MINUTES0); 
 	 clockDivider #(9,3)   clk3 (CLK, MINUTES0, ENABLE, IN3, STATE3, MINUTES1); 
 	 clockDivider #(5,3)   clk4 (CLK, MINUTES1, ENABLE, IN4, STATE4, IGNORE);
+	 
+	 clockDivider #(9,3)   speed (CLK, SECONDS0, 1'b0, 4'b0, SLOWSTATE, SLOWER); 
 	 
 	 always @(*) begin
 		 if (KEY[1]) begin
@@ -86,6 +85,11 @@ module clock(
 			IN4 <= 4'h5;
 		 end else begin
 			ENABLE <= 1'b0;
+		 end
+		 if (!KEY[2]) begin
+			SPEED <= SECONDS0;
+		 end else begin
+			SPEED <= SLOWER;
 		 end
 	end
 endmodule
@@ -130,18 +134,6 @@ parameter state_bits = 25;
 	output[state_bits:0] CLKSTATE;
 	reg CLKOUT;
 	reg[state_bits:0] CLKSTATE;
-	
-	/**
-	reg[state_bits:0] NEXTCLK;
-	always @(posedge CLKIN)
-		if (CLKSTATE > count) begin
-			NEXTCLK <= 31'h0;
-			CLKOUT <= 1;
-		end else begin
-			NEXTCLK <= CLKSTATE + 1;
-			CLKOUT <= 0;
-		end
-	**/
 		
 	 always @(posedge CLK) begin
 		if (WRITE) begin
