@@ -17,32 +17,38 @@ module clock(
 	 
 	 wire[31:0] STATE0;
 	 
-	 reg ENABLE;
+	 reg WRITE_ENABLE;
 	 
+	 // new values in case we reset the counter to 59:00 or 00:00
+	 // in1 is low seconds, in4 is high minutes
 	 reg[3:0] IN1;
 	 reg[3:0] IN2;
 	 reg[3:0] IN3;
 	 reg[3:0] IN4;
 	 
+	 // hex value for each segment display. state1 is seconds lo, state4 is minutes hi
+	 // slow state is used when key 3 is disabled
 	 wire[3:0] SLOWSTATE;
 	 wire[3:0] STATE1;
 	 wire[3:0] STATE2;
 	 wire[3:0] STATE3;
 	 wire[3:0] STATE4;
 	 
+	 // 7 segment displays. dis0 is lo seconds , disp3 is hi minutes
 	 reg[3:0] DISP0;
 	 reg[3:0] DISP1;
 	 reg[3:0] DISP2;
 	 reg[3:0] DISP3;
 	 
-	 wire SECONDS0;
-	 wire SECONDS1;
+	 wire SECONDS_LO;
+	 wire SECONDS_HI;
 	 wire SLOWER;
 	 reg SPEED;
 	 
-	 wire MINUTES0;
-	 wire MINUTES1;
+	 wire MINUTES_LO;
+	 wire MINUTES_HI;
 	 
+	 // we need a wire for hi minute's output, but its output doesnt matter, so ignore
 	 wire IGNORE;
 	 
 	 display d0 (DISP0, HEX0);
@@ -51,13 +57,14 @@ module clock(
 	 display d3 (DISP3, HEX3);
 	 
 	 
-	 clockDivider #(5000000,31) clk0 (CLK, 1'b1, 1'b0, 32'b0, STATE0, SECONDS0); 
-	 clockDivider #(9,3)   clk1 (CLK, SPEED, ENABLE, IN1, STATE1, SECONDS1); 
-	 clockDivider #(5,3)   clk2 (CLK, SECONDS1, ENABLE, IN2, STATE2, MINUTES0); 
-	 clockDivider #(9,3)   clk3 (CLK, MINUTES0, ENABLE, IN3, STATE3, MINUTES1); 
-	 clockDivider #(5,3)   clk4 (CLK, MINUTES1, ENABLE, IN4, STATE4, IGNORE);
+	 clockDivider #(5000000,31) clk0 (CLK, 1'b1, 1'b0, 32'b0, STATE0, SECONDS_LO); 
+	 clockDivider #(9,3)   clk_seconds_lo (CLK, SPEED, WRITE_ENABLE, IN1, STATE1, SECONDS_HI); 
+	 clockDivider #(5,3)   clk_seconds_hi (CLK, SECONDS_HI, WRITE_ENABLE, IN2, STATE2, MINUTES_LO); 
+	 clockDivider #(9,3)   clk_minutes_lo (CLK, MINUTES_LO, WRITE_ENABLE, IN3, STATE3, MINUTES_HI); 
+	 clockDivider #(5,3)   clk_minutes_hi (CLK, MINUTES_HI, WRITE_ENABLE, IN4, STATE4, IGNORE);
 	 
-	 clockDivider #(9,3)   speed (CLK, SECONDS0, 1'b0, 4'b0, SLOWSTATE, SLOWER); 
+	 // clock used to count 10x faster on key 3
+	 clockDivider #(9,3)   speed (CLK, SECONDS_LO, 1'b0, 4'b0, SLOWSTATE, SLOWER); 
 	 
 	 always @(*) begin
 		 if (KEY[1]) begin
@@ -72,22 +79,22 @@ module clock(
 			DISP3 <= DISP3;
 		 end
 		 if (!KEY[0]) begin
-			ENABLE <= 1'b1;
+			WRITE_ENABLE <= 1'b1;
 			IN1 <= 4'h0;
 			IN2 <= 4'h0;
 			IN3 <= 4'h0;
 			IN4 <= 4'h0;
 		 end else if (!KEY[3]) begin
-			ENABLE <= 1'b1;
+			WRITE_ENABLE <= 1'b1;
 			IN1 <= 4'h0;
 			IN2 <= 4'h0;
 			IN3 <= 4'h9;
 			IN4 <= 4'h5;
 		 end else begin
-			ENABLE <= 1'b0;
+			WRITE_ENABLE <= 1'b0;
 		 end
 		 if (!KEY[2]) begin
-			SPEED <= SECONDS0;
+			SPEED <= SECONDS_LO;
 		 end else begin
 			SPEED <= SLOWER;
 		 end
@@ -121,14 +128,14 @@ module display(NUM, HEX);
 	endcase
 endmodule
 
-module clockDivider(CLK, INC, WRITE, VALUE, CLKSTATE, CLKOUT);
+module clockDivider(CLK, INCREMENT, WRITE_ENABLE, VALUE, CLKSTATE, CLKOUT);
 parameter count = 0;
 parameter state_bits = 25;
 
 	input CLK;
-	input INC;
-	input WRITE;
-	input[state_bits:0] VALUE;
+	input INCREMENT;
+	input WRITE_ENABLE;
+	input[state_bits:0] WRITE_VALUE;
 	
 	output CLKOUT;
 	output[state_bits:0] CLKSTATE;
@@ -136,14 +143,16 @@ parameter state_bits = 25;
 	reg[state_bits:0] CLKSTATE;
 		
 	 always @(posedge CLK) begin
-		if (WRITE) begin
-			CLKSTATE <= VALUE;
+	 	// if we need to reset the display (to either 00:00 or 59:00 minutes
+	 	// then WRITE_ENABLE is true
+		if (WRITE_ENABLE) begin
+			CLKSTATE <= WRITE_VALUE;
 		end else begin
 			if (CLKSTATE > count) begin
 				CLKSTATE <= 31'h0;
 				CLKOUT <= 1;
 			end else begin
-				CLKSTATE <= CLKSTATE + INC;
+				CLKSTATE <= CLKSTATE + INCREMENT;
 				CLKOUT <= 0;
 			end
 		end
