@@ -17,10 +17,22 @@ module clock(
 	 
 	 wire[31:0] STATE0;
 	 
+	 reg ENABLE;
+	 
+	 reg[3:0] IN1;
+	 reg[3:0] IN2;
+	 reg[3:0] IN3;
+	 reg[3:0] IN4;
+	 
 	 wire[3:0] STATE1;
 	 wire[3:0] STATE2;
 	 wire[3:0] STATE3;
 	 wire[3:0] STATE4;
+	 
+	 reg[3:0] DISP0;
+	 reg[3:0] DISP1;
+	 reg[3:0] DISP2;
+	 reg[3:0] DISP3;
 	 
 	 wire SECONDS0;
 	 wire SECONDS1;
@@ -36,17 +48,46 @@ module clock(
 	 display d3 (STATE0[31:28], HEX3);
 	 **/
 	 
-	 display d0 (STATE1, HEX0);
-	 display d1 (STATE2, HEX1);
-	 display d2 (STATE3, HEX2);
-	 display d3 (STATE4, HEX3);
+	 display d0 (DISP0, HEX0);
+	 display d1 (DISP1, HEX1);
+	 display d2 (DISP2, HEX2);
+	 display d3 (DISP3, HEX3);
 	 
 	 
-	 clockDivider #(50000000,31) clk0 (CLK, STATE0, SECONDS0); 
-	 clockDivider #(8,3)   clk1 (SECONDS0, STATE1, SECONDS1); 
-	 clockDivider #(4,3)    clk2 (SECONDS1, STATE2, MINUTES0); 
-	 clockDivider #(8,3)   clk3 (MINUTES0, STATE3, MINUTES1); 
-	 clockDivider #(4,3)    clk4 (MINUTES1, STATE4, IGNORE); 
+	 clockDivider #(50000000,31) clk0 (CLK, 1'b1, 1'b0, 32'b0, STATE0, SECONDS0); 
+	 clockDivider #(9,3)   clk1 (CLK, SECONDS0, ENABLE, IN1, STATE1, SECONDS1); 
+	 clockDivider #(5,3)   clk2 (CLK, SECONDS1, ENABLE, IN2, STATE2, MINUTES0); 
+	 clockDivider #(9,3)   clk3 (CLK, MINUTES0, ENABLE, IN3, STATE3, MINUTES1); 
+	 clockDivider #(5,3)   clk4 (CLK, MINUTES1, ENABLE, IN4, STATE4, IGNORE);
+	 
+	 always @(*) begin
+		 if (KEY[1]) begin
+			DISP0 <= STATE1;
+			DISP1 <= STATE2;
+			DISP2 <= STATE3;
+			DISP3 <= STATE4;
+		 end else begin
+			DISP0 <= DISP0;
+			DISP1 <= DISP1;
+			DISP2 <= DISP2;
+			DISP3 <= DISP3;
+		 end
+		 if (!KEY[0]) begin
+			ENABLE <= 1'b1;
+			IN1 <= 4'h0;
+			IN2 <= 4'h0;
+			IN3 <= 4'h0;
+			IN4 <= 4'h0;
+		 end else if (!KEY[3]) begin
+			ENABLE <= 1'b1;
+			IN1 <= 4'h0;
+			IN2 <= 4'h0;
+			IN3 <= 4'h9;
+			IN4 <= 4'h5;
+		 end else begin
+			ENABLE <= 1'b0;
+		 end
+	end
 endmodule
 
 module display(NUM, HEX);
@@ -76,23 +117,43 @@ module display(NUM, HEX);
 	endcase
 endmodule
 
-module clockDivider(CLKIN, CLKSTATE, CLKOUT);
+module clockDivider(CLK, INC, WRITE, VALUE, CLKSTATE, CLKOUT);
 parameter count = 0;
 parameter state_bits = 25;
 
-	input CLKIN;
+	input CLK;
+	input INC;
+	input WRITE;
+	input[state_bits:0] VALUE;
 	
 	output CLKOUT;
 	output[state_bits:0] CLKSTATE;
 	reg CLKOUT;
 	reg[state_bits:0] CLKSTATE;
 	
+	/**
+	reg[state_bits:0] NEXTCLK;
 	always @(posedge CLKIN)
-	if (CLKSTATE > count) begin
-		CLKSTATE <= 31'h0;
-		CLKOUT <= 1;
-	end else begin
-		CLKSTATE <= CLKSTATE + 1;
-		CLKOUT <= 0;
+		if (CLKSTATE > count) begin
+			NEXTCLK <= 31'h0;
+			CLKOUT <= 1;
+		end else begin
+			NEXTCLK <= CLKSTATE + 1;
+			CLKOUT <= 0;
+		end
+	**/
+		
+	 always @(posedge CLK) begin
+		if (WRITE) begin
+			CLKSTATE <= VALUE;
+		end else begin
+			if (CLKSTATE > count) begin
+				CLKSTATE <= 31'h0;
+				CLKOUT <= 1;
+			end else begin
+				CLKSTATE <= CLKSTATE + INC;
+				CLKOUT <= 0;
+			end
+		end
 	end
 endmodule
