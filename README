@@ -1,19 +1,40 @@
-Due date: Sunday 9/14/2014 @11:59pm
+Due date: Sunday 9/21/2014 @11:59pm
 
-Objective: Work on your Verilog and design skills
+Objective: Implement a simple instruction set
 
-Assignment: Edit clock.v and add the following functionality:
+Assignment: 
 
-- Show the elapsed time since your design was loaded
-    * HEX3:HEX2 display minutes in decimal
-    * HEX1:HEX0 display seconds in decimal
+Implement a subset of the C16 instruction set in Verilog. Next week, we'll
+start working with 16cubed and understand the subtle differences in
+implementation.
 
-- KEY0 sets the elapsed time to 0000
+You also need to embed your own own unit tests in your
+design. Please feel free to share unit tests with the class.
 
-- KEY1 freezes the display at the current time. Counting continues while
-  the key is depressed and the correct time is shown when the key is released
+- We have no program memory, the program needs to be embedded in your design
+  as combinational logic. This impacts build time so keep your programs small
 
-- KEY2 runs the time at 10x speed (the seconds advance once every 1/10 of a
-  second)
+- We have no data memory, let's skip the load and store instructions for this
+  assignment. Treat them as noops
 
-- KEY3 sets the elapsed time to 5900
+- We need to single-step through programs, Let's use KEY0 as a clock.
+
+- You only need to implement and test the following instruction:
+
+    - add (f=0, f=1)
+    - slt (f=0; f=1)
+    - lea (f=0, f=1)
+    - call (f=0, f=1)
+    - brz (f=0, f=1)
+    - shl (f=0, f=1)   // no mul, both forms are shifts
+
+- We'll pick the most creative tests and use them to test everyone's code
+
+- the hex display depends on the position of the SW[4:0]
+
+    - 0xxx   => show register xxx
+    - 1000   => show the current instruction
+
+- LDER[9:0] display the 10 least significant bits of the PC
+- LEDG[7:0] display the 8 most significant bits of the current instruction
+
