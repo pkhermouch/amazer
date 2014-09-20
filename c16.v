@@ -55,7 +55,7 @@ output		     [6:0]		HEX3;
  /////////////////////////
 	 
     reg [15:0]regs[15:0];     // register
-    reg [15:0]pc;             // the pc
+    reg [15:0]pc = 0;             // the pc
 	 
  ///////////
  // fetch //
@@ -216,8 +216,7 @@ end
              else debug = regs[SW[3:0]];
 	 end
 
-     always @(posedge CPU_RESET_n)
-         pc <= 0;
+
 	 
 	 /////////////////////////
 	 // The sequential part //
