@@ -125,7 +125,7 @@ end
     always @(*) begin
         rfen = 0;
         rfdata = 0;
-        nextpc = pc + 2;
+        nextpc = pc + 1;
         case (opcode)
             // Add, f = 0
             5'b00000: begin
@@ -215,6 +215,9 @@ end
 	     if (SW[4]) debug = pc;
              else debug = regs[SW[3:0]];
 	 end
+
+     always @(posedge CPU_RESET_n)
+         pc <= 0;
 	 
 	 /////////////////////////
 	 // The sequential part //
@@ -234,6 +237,7 @@ module display(NUM, HEX);
 	
 	output[6:0] HEX;
 	reg[6:0] HEX;
+
 	
 	always @(*)
 	case (NUM)
