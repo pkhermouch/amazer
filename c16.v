@@ -64,15 +64,31 @@ output		     [6:0]		HEX3;
     reg [15:0]inst;           // the instruction
 	 
     // hardwired program, need to start some where
-    always @(*) begin
-        case(pc)
-            16'b0000000000000000 : inst = 16'hf011;    // li r1,1
-	    16'b0000000000000010 : inst = 16'hf022;    // li r2,2
-	    16'b0000000000000100 : inst = 16'h0012;    // add r2,r1
-	    16'b0000000000000110 : inst = 16'he004;    // ji 4
-	    default : inst = 16'bxxxxxxxxxxxxxxxx;
+    always @(*) begin	
+	case(pc)
+		16'h0001 : inst = 16'h00e0; 
+		16'h0002 : inst = 16'h01e0; 
+		16'h0003 : inst = 16'h02e0; 
+		16'h0004 : inst = 16'hde05; 
+		16'h0005 : inst = 16'hde06; 
+		16'h0006 : inst = 16'hde09; 
+		16'h0007 : inst = 16'hde06; 
+		16'h0008 : inst = 16'hfffc; 
+		16'h0009 : inst = 16'h0121; 
+		16'h000a : inst = 16'hf7c0; 
+		16'h000b : inst = 16'h0a41; 
+		16'h000c : inst = 16'hf7c0; 
+		16'h000d : inst = 16'h8244; 
+		16'h000e : inst = 16'hf7c0; 
+		16'h000f : inst = 16'h033f; 
+		16'h0010 : inst = 16'h2368; 
+		16'h0011 : inst = 16'hcc03; 
+		16'h0012 : inst = 16'hf380; 
+		16'h0013 : inst = 16'hf7c0; 
+		16'h0014 : inst = 16'hff00; 
+		default : inst = 16'bxxxxxxxxxxxxxxxx; 
 	endcase
-    end
+end
 	 
 	 ///////////////////
 	 // decode & regs //
