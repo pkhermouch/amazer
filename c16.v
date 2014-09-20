@@ -85,8 +85,8 @@ output		     [6:0]		HEX3;
     wire [2:0] rb = inst[2:0];
     wire [15:0] imm5;
     wire [15:0] imm8;
-    sine_extenz #(5) (IN=inst[4:0], OUT=imm5);
-    sine_extenz #(8) (IN=inst[7:0], OUT=imm8);
+    sine_extenz #(5) (inst[4:0], imm5);
+    sine_extenz #(8) (inst[7:0], imm8);
     // Computed values
     wire [15:0] va = regs[ra];
     wire [15:0] vb = regs[rb];
@@ -121,6 +121,7 @@ output		     [6:0]		HEX3;
             5'b00001: begin
                 rfen = 1;
                 rfdata = va + vb;
+				end
              
             // Slt, f = 0
             5'b00100: begin
@@ -187,11 +188,11 @@ output		     [6:0]		HEX3;
 	 ///////////////////
          reg [15:0]debug;
 	 assign LEDG = inst[15:8];
-	 assign LEDR = pc[9:0]
-     d0 = display(debug[15:12], HEX0);
-     d1 = display(debug[11:8], HEX1);
-     d2 = display(debug[7:4], HEX2);
-     d3 = display(debug[3:0], HEX3);
+	 assign LEDR = pc[9:0];
+     display(debug[15:12], HEX0);
+     display(debug[11:8], HEX1);
+     display(debug[7:4], HEX2);
+     display(debug[3:0], HEX3);
 
   	 // what do we display
 	 always @(*) begin
@@ -205,7 +206,7 @@ output		     [6:0]		HEX3;
 	 
 	 always @(posedge clk) begin
              pc <= nextpc;
-             if (rfen) regs[dest] <= rfdata;
+             if (rfen) regs[rd] <= rfdata;
 	 end
 
 
@@ -248,15 +249,16 @@ module sine_extenz(IN, OUT);
     reg [15:0] all1 = 16'hffff;
     reg [15:0] all0 = 16'h0;
     
+	 always @(*)
     if (IN[SIZZ - 1]) begin
         result[SIZZ - 1:0] = IN;
         result[15:SIZZ] = all1[15:SIZZ];
-    else begin
+    end else begin
         result[SIZZ - 1:0] = IN;
         result[15:SIZZ] = all0[15:SIZZ];
     end
     
-    OUT = result;
+    assign OUT = result;
     
 endmodule
 
