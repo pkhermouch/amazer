@@ -77,49 +77,108 @@ output		     [6:0]		HEX3;
 	 ///////////////////
 	 // decode & regs //
 	 ///////////////////
-	 
-	 wire [3:0]src = inst[7:4];
-	 wire [3:0]dest = inst[3:0];
-	 wire [15:0]v0 = regs[src];
-	 wire [15:0]v1 = regs[dest];
-	 
-	 /////////////
-	 // execute //
-	 /////////////
-	 
-	 reg [15:0] nextpc;        // the next pc
-	 reg rfen;                 // this instructions modifies a register
-	 reg [15:0]rfdata;         // the register value
-	 
-	 always @(*) begin
-             rfen = 0;
-             rfdata = 0;
-             nextpc = pc + 2;
-	     case(inst[15:12])
-             4'b1110 : begin // ji imm
-	         rfen = 0;
-		 nextpc = {4'b0000, inst[11:0]};
-	     end
-             4'b1111 : begin // li dest,imm
-		 rfen = 1;
-                 rfdata = {8'b00000000, inst[11:4]};
-                 nextpc = pc + 2;
-             end
-             default : begin
-                 case(inst[15:8])
-	         8'b00000000 : begin // add dest,src
-                     rfen = 1;
-		     rfdata = v0 + v1;
-		     nextpc = pc + 2;
-	         end
-                 default: begin
-                     rfen = 0;
-                     nextpc = pc;
-                 end
-                 endcase
-             end
-             endcase
-         end
+
+     // Fields in the instruction
+     wire [4:0] opcode = inst[15:11];
+    wire [2:0] rd = inst[10:8];
+    wire [2:0] ra = inst[7:5];
+    wire [2:0] rb = inst[2:0];
+    wire [15:0] imm5;
+    wire [15:0] imm8;
+    sine_extenz #(5) (IN=inst[4:0], OUT=imm5);
+    sine_extenz #(8) (IN=inst[7:0], OUT=imm8);
+    // Computed values
+    wire [15:0] va = regs[ra];
+    wire [15:0] vb = regs[rb];
+    wire [15:0] vd = regs[rd];
+     /*
+ wire [3:0]src = inst[7:4];
+ wire [3:0]dest = inst[3:0];
+ wire [15:0]v0 = regs[src];
+ wire [15:0]v1 = regs[dest];
+    */
+ 
+ /////////////
+ // execute //
+ /////////////
+ 
+ reg [15:0] nextpc;        // the next pc
+ reg rfen;                 // this instructions modifies a register
+ reg [15:0]rfdata;         // the register value
+ 
+    always @(*) begin
+        rfen = 0;
+        rfdata = 0;
+        nextpc = pc + 2;
+        case (opcode)
+            // Add, f = 0
+            5'b00000: begin
+                rfen = 1;
+                rfdata = imm5 + va;
+            end
+            
+            // Add, f = 1
+            5'b00001: begin
+                rfen = 1;
+                rfdata = va + vb;
+             
+            // Slt, f = 0
+            5'b00100: begin
+                rfen = 1;
+                rfdata = (va < imm5);
+            end
+             
+            // Slt, f = 1
+            5'b00101: begin
+                rfen = 1;
+                rfdata = (va < vb);
+            end
+            
+            // Lea, f = 0
+            5'b11000: begin
+                rfen = 1;
+                rfdata = va + imm5;
+            end
+            
+            // Lea, f = 1
+            5'b11001: begin
+                rfen = 1;
+                rfdata = pc + imm8;
+            end
+            
+             // Call, f = 0
+            5'b11010: begin
+                rfen = 1;
+                rfdata = pc;
+                nextpc = va + imm5;
+            end
+            
+            // Call, f = 1
+            5'b11011: begin
+                rfen = 1;
+                rfdata = pc;
+                nextpc = pc + imm8;
+            end
+            
+            // brz, f = 0
+            5'b11110: begin
+                if (vd == 0)
+                    nextpc = va + imm5;
+            end
+            
+            //brazos, f = 1
+            5'b11111: begin
+                if (vd == 0)
+                    nextpc = pc + imm8;
+            end
+            
+            //shell, f = 0
+            5'b1000?: begin
+                rfen = 1;
+                rfdata = va << imm5;
+            end
+        endcase
+    end
 	 
 	 wire clk = KEY[0];        // single step using key0
 	 
@@ -148,6 +207,7 @@ output		     [6:0]		HEX3;
 
 endmodule
 
+
 module display(NUM, HEX);
 	input[3:0] NUM;
 	
@@ -174,3 +234,25 @@ module display(NUM, HEX);
 		4'hF : HEX = 7'b0001110;
 	endcase
 endmodule
+
+module sine_extenz(IN, OUT);
+    parameter SIZZ;
+    input [SIZZ - 1:0]IN;
+    output [15:0]OUT;
+    
+    reg [15:0] result;
+    reg [15:0] all1 = 16'hffff;
+    reg [15:0] all0 = 16'h0;
+    
+    if (IN[SIZZ - 1]) begin
+        result[SIZZ - 1:0] = IN;
+        result[15:SIZZ] = all1[15:SIZZ];
+    else begin
+        result[SIZZ - 1:0] = IN;
+        result[15:SIZZ] = all0[15:SIZZ];
+    end
+    
+    OUT = result;
+    
+endmodule
+
