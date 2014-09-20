@@ -198,20 +198,14 @@ always @(*) begin
                 nextpc = va + imm5;
         end
             
-        //brazos, f = 1
+        // brz, f = 1
         5'b11111: begin
             if (vd == 0)
                 nextpc = pc + imm8;
         end
             
-        //shell, f = 0
-        5'b10000: begin
-            rfen = 1;
-            rfdata = va << imm5[3:0];
-        end
-				
-    	//shell, f = 1
-        5'b10001: begin
+        // shl, f = 0
+        5'b1000x: begin
             rfen = 1;
             rfdata = va << imm5[3:0];
         end
