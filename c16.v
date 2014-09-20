@@ -54,8 +54,20 @@ output		     [6:0]		HEX3;
  // The processor state //
  /////////////////////////
 	 
-    reg [15:0]regs[15:0];     // register
-    reg [15:0]pc = 0;             // the pc
+    reg [15:0]regs[7:0];     // register
+    reg [15:0]pc;             // the pc
+	 
+	 initial begin
+		pc = 0;
+		regs[0] = 0;
+		regs[1] = 0;
+		regs[2] = 0;
+		regs[3] = 0;
+		regs[4] = 0;
+		regs[5] = 0;
+		regs[6] = 0;
+		regs[7] = 0;
+		end
 	 
  ///////////
  // fetch //
@@ -66,29 +78,12 @@ output		     [6:0]		HEX3;
     // hardwired program, need to start some where
     always @(*) begin	
 	case(pc)
-	16'h0000 : inst = 16'hff01;
-		16'h0001 : inst = 16'h00e0; 
-		16'h0002 : inst = 16'h01e0; 
-		16'h0003 : inst = 16'h02e0; 
-		16'h0004 : inst = 16'hde05; 
-		16'h0005 : inst = 16'hde06; 
-		16'h0006 : inst = 16'hde09; 
-		16'h0007 : inst = 16'hde06; 
-		16'h0008 : inst = 16'hfffc; 
-		16'h0009 : inst = 16'h0121; 
-		16'h000a : inst = 16'hf7c0; 
-		16'h000b : inst = 16'h0a41; 
-		16'h000c : inst = 16'hf7c0; 
-		16'h000d : inst = 16'h8244; 
-		16'h000e : inst = 16'hf7c0; 
-		16'h000f : inst = 16'h033f; 
-		16'h0010 : inst = 16'h2368; 
-		16'h0011 : inst = 16'hcc03; 
-		16'h0012 : inst = 16'hf380; 
-		16'h0013 : inst = 16'hf7c0; 
-		16'h0014 : inst = 16'hff00; 
-		default : inst = 16'bxxxxxxxxxxxxxxxx; 
-	endcase
+    16'h0000: inst = 16'h0005; //r0 = r0 + 5
+    16'h0001: inst = 16'h0101; //r1 = r0 + 1 
+    16'h0002: inst = 16'h0a01; //r2 = r0 + r1 //this should equal eleven
+    16'h0003: inst = 16'h0000; //no op // program end
+    default: inst = 16'bxxxxxxxxxxxxxxxx;
+endcase
 end
 	 
 	 ///////////////////
@@ -213,8 +208,8 @@ end
 
   	 // what do we display
 	 always @(*) begin
-	     if (SW[4]) debug = pc;
-             else debug = regs[SW[3:0]];
+	     if (SW[3]) debug = pc;
+             else debug = regs[SW[2:0]];
 	 end
 
 
