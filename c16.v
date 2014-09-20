@@ -206,10 +206,10 @@ end
          reg [15:0]debug;
 	 assign LEDG = inst[15:8];
 	 assign LEDR = pc[9:0];
-     display(debug[15:12], HEX0);
-     display(debug[11:8], HEX1);
-     display(debug[7:4], HEX2);
-     display(debug[3:0], HEX3);
+     display(debug[15:12], HEX3);
+     display(debug[11:8], HEX2);
+     display(debug[7:4], HEX1);
+     display(debug[3:0], HEX0);
 
   	 // what do we display
 	 always @(*) begin
