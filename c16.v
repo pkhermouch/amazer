@@ -119,11 +119,12 @@ output		     [6:0]		HEX3;
     wire [2:0] rd = inst[10:8];
     wire [2:0] ra = inst[7:5];
     wire [2:0] rb = inst[2:0];
+    // Immediate values, sign extended using our custom module
     wire [15:0] imm5;
     wire [15:0] imm8;
-    sine_extenz #(5) (inst[4:0], imm5);
-    sine_extenz #(8) (inst[7:0], imm8);
-    // Computed values
+    sign_extend_16 #(5) (inst[4:0], imm5);
+    sign_extend_16 #(8) (inst[7:0], imm8);
+    // Values loaded from registers
     wire [15:0] va = regs[ra];
     wire [15:0] vb = regs[rb];
     wire [15:0] vd = regs[rd];
@@ -243,6 +244,7 @@ end
 	 
 always @(posedge clk) begin
     pc <= nextpc;
+    // If the target is R7, don't write out the value
     if (rfen && rd != 7) regs[rd] <= rfdata;
 end
 
@@ -275,9 +277,11 @@ module display(NUM, HEX);
 	endcase
 endmodule
 
-module sine_extenz(IN, OUT);
-    parameter SIZZ;
-    input [SIZZ - 1:0]IN;
+// Sign extension module
+module sign_extend_16(IN, OUT);
+    // The width of the input value in bits
+    parameter INPUT_WIDTH;
+    input [INPUT_WIDTH - 1:0]IN;
     output [15:0]OUT;
     
     reg [15:0] result;
@@ -285,12 +289,12 @@ module sine_extenz(IN, OUT);
     reg [15:0] all0 = 16'h0;
     
     always @(*)
-        if (IN[SIZZ - 1]) begin
-            result[SIZZ - 1:0] = IN;
-            result[15:SIZZ] = all1[15:SIZZ];
+        if (IN[INPUT_WIDTH - 1]) begin
+            result[INPUT_WIDTH - 1:0] = IN;
+            result[15:INPUT_WIDTH] = all1[15:INPUT_WIDTH];
         end else begin
-            result[SIZZ - 1:0] = IN;
-            result[15:SIZZ] = all0[15:SIZZ];
+            result[INPUT_WIDTH - 1:0] = IN;
+            result[15:INPUT_WIDTH] = all0[15:INPUT_WIDTH];
         end
     
     assign OUT = result;
