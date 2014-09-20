@@ -76,15 +76,39 @@ output		     [6:0]		HEX3;
     reg [15:0]inst;           // the instruction
 	 
     // hardwired program, need to start some where
-    always @(*) begin	
-	case(pc)
-    16'h0000: inst = 16'h0005; //r0 = r0 + 5
-    16'h0001: inst = 16'h0101; //r1 = r0 + 1 
-    16'h0002: inst = 16'h0a01; //r2 = r0 + r1 //this should equal eleven
-    16'h0003: inst = 16'h0000; //no op // program end
-    default: inst = 16'bxxxxxxxxxxxxxxxx;
-endcase
-end
+    always @(*) begin
+        case(pc)                          // Instruction                      Binary              Result
+            16'h0000 : inst = 16'h0002;   // add   r0 := r0 + 2               b00000000 00000010  r0=2
+            16'h0001 : inst = 16'h07E2;   // add   Z := Z + 2                 b00000111 11100010  z=0, z is constant  
+            16'h0002 : inst = 16'h0807;   // add   r0 := r0 + Z               b00001000 00000111  no change in state  
+            16'h0003 : inst = 16'h0124;   // add   r1 := r1 + 4               b00000001 00100100  r1=4
+            16'h0004 : inst = 16'h0A01;   // add   r2 := r0 + r1              b00001010 00000001  r2=6
+            16'h0005 : inst = 16'h0A41;   // add   r2 := r2 + r1              b00001010 01000001  r2=Ah
+            
+            16'h0006 : inst = 16'h234B;   // slt   r3 := r2 < 4'Bh            b00100011 01001011  r3=1
+            16'h0007 : inst = 16'h2B22;   // slt   r3 := r1 < r2              b00101011 00100010  r3=1
+            16'h0008 : inst = 16'h2B41;   // slt   r3 := r2 < r1              b00101011 01000001  r3=0
+            16'h0009 : inst = 16'h2B61;   // slt   r3 := r3 < r1              b00101011 01100001  r3=1
+ 
+            16'h000A : inst = 16'hC35F;   // lea   r3 := r2 + 1Fh             b11000011 01011111  r3=29h
+            16'h000B : inst = 16'hCB20;   // lea   r3 := pc + 20h             b11001011 00100000  r3=2Bh
+            
+            16'h000C : inst = 16'hD561;   // call  r5 := pc; pc := r3 + 1     b11010101 01100001  r5=Ch, pc=002Ch
+            16'h002C : inst = 16'hDD03;   // call  r5 := pc; pc := pc + 3     b11011101 00000011  r5=2Ch, pc=002Fh
+            
+            16'h002F : inst = 16'h04E0;   // add   r4 := Z + 0 => li r4,0     b00000100 11100000  r4=0
+            16'h0030 : inst = 16'hF467;   // brz   pc := r3 + 7h if r4 == 0   b11110100 01100111  pc=0032h
+            16'h0032 : inst = 16'hF067;   // brz   pc := r3 + 7h if r0 == 0   b11110000 01100111  no change in state
+            16'h0033 : inst = 16'hFC04;   // brz   pc := pc + 4 if r4 == 0    b11111100 00000100  pc=0037h
+            16'h0037 : inst = 16'hF804;   // brz   pc := pc + 4 if r0 == 0    b11111000 00000100  no change in state
+            16'h0038 : inst = 16'h8664;   // shl   r6 := r3 << 4              b10000110 01100100  r6=2B0h
+            16'h0039 : inst = 16'h85A1;   // shl   r5 := r5 << 1              b10000101 10100001  r5=58h
+            16'h003A : inst = 16'h85A3;   // shl   r5 := r5 << 3              b10000101 10100011  r5=2C0h
+            16'h003B : inst = 16'hFF00;   // brz   pc := pc + 0 => halt       b11111111 00000000  halt
+            default: inst = 16'bxxxxxxxxxxxxxxxx;
+            // Final State r0 = 2, r1 = 4, r2 = Ah, r3 = 2Bh, r4 = 0, r5 = 2C0h, r6 = 2B0h, r7 = 0 (Z) 
+        endcase
+    end
 	 
 	 ///////////////////
 	 // decode & regs //
@@ -186,10 +210,17 @@ end
             end
             
             //shell, f = 0
-            5'b1000?: begin
+            5'b10000: begin
                 rfen = 1;
-                rfdata = va << imm5;
+                rfdata = va << imm5[3:0];
             end
+				
+				//shell, f = 1
+            5'b10001: begin
+                rfen = 1;
+                rfdata = va << imm5[3:0];
+            end
+				
         endcase
     end
 	 
@@ -220,7 +251,7 @@ end
 	 
 	 always @(posedge clk) begin
              pc <= nextpc;
-             if (rfen) regs[rd] <= rfdata;
+             if (rfen && rd != 7) regs[rd] <= rfdata;
 	 end
 
 
