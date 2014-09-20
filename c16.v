@@ -186,10 +186,14 @@ output		     [6:0]		HEX3;
          // debug support //
 	 ///////////////////
          reg [15:0]debug;
-	 assign LEDG = debug[7:0];
-	 assign LEDR = debug[15:8];
-	 
-	 // what do we display
+	 assign LEDG = inst[15:8];
+	 assign LEDR = pc[9:0]
+     d0 = display(debug[15:12], HEX0);
+     d1 = display(debug[11:8], HEX1);
+     d2 = display(debug[7:4], HEX2);
+     d3 = display(debug[3:0], HEX3);
+
+  	 // what do we display
 	 always @(*) begin
 	     if (SW[4]) debug = pc;
              else debug = regs[SW[3:0]];
