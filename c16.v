@@ -66,6 +66,7 @@ output		     [6:0]		HEX3;
     // hardwired program, need to start some where
     always @(*) begin	
 	case(pc)
+	16'h0000 : inst = 16'hff01;
 		16'h0001 : inst = 16'h00e0; 
 		16'h0002 : inst = 16'h01e0; 
 		16'h0003 : inst = 16'h02e0; 
