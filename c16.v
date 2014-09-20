@@ -50,14 +50,14 @@ output		     [6:0]		HEX2;
 output		     [6:0]		HEX3;
 
 
- /////////////////////////
- // The processor state //
- /////////////////////////
+/////////////////////////
+// The processor state //
+/////////////////////////
 	 
     reg [15:0]regs[7:0];     // register
     reg [15:0]pc;             // the pc
 	 
-	 initial begin
+	initial begin
 		pc = 0;
 		regs[0] = 0;
 		regs[1] = 0;
@@ -67,11 +67,11 @@ output		     [6:0]		HEX3;
 		regs[5] = 0;
 		regs[6] = 0;
 		regs[7] = 0;
-		end
+	end
 	 
- ///////////
- // fetch //
- ///////////
+///////////
+// fetch //
+///////////
 	 
     reg [15:0]inst;           // the instruction
 	 
@@ -110,12 +110,12 @@ output		     [6:0]		HEX3;
         endcase
     end
 	 
-	 ///////////////////
-	 // decode & regs //
-	 ///////////////////
+	///////////////////
+	// decode & regs //
+	///////////////////
 
-     // Fields in the instruction
-     wire [4:0] opcode = inst[15:11];
+    // Fields in the instruction
+    wire [4:0] opcode = inst[15:11];
     wire [2:0] rd = inst[10:8];
     wire [2:0] ra = inst[7:5];
     wire [2:0] rb = inst[2:0];
@@ -127,136 +127,126 @@ output		     [6:0]		HEX3;
     wire [15:0] va = regs[ra];
     wire [15:0] vb = regs[rb];
     wire [15:0] vd = regs[rd];
-     /*
- wire [3:0]src = inst[7:4];
- wire [3:0]dest = inst[3:0];
- wire [15:0]v0 = regs[src];
- wire [15:0]v1 = regs[dest];
-    */
  
- /////////////
- // execute //
- /////////////
+/////////////
+// execute //
+/////////////
  
- reg [15:0] nextpc;        // the next pc
- reg rfen;                 // this instructions modifies a register
- reg [15:0]rfdata;         // the register value
+reg [15:0] nextpc;        // the next pc
+reg rfen;                 // this instructions modifies a register
+reg [15:0]rfdata;         // the register value
  
-    always @(*) begin
-        rfen = 0;
-        rfdata = 0;
-        nextpc = pc + 1;
-        case (opcode)
-            // Add, f = 0
-            5'b00000: begin
-                rfen = 1;
-                rfdata = imm5 + va;
-            end
-            
-            // Add, f = 1
-            5'b00001: begin
-                rfen = 1;
-                rfdata = va + vb;
-				end
+always @(*) begin
+    rfen = 0;
+    rfdata = 0;
+    nextpc = pc + 1;
+    case (opcode)
+        // Add, f = 0
+        5'b00000: begin
+            rfen = 1;
+            rfdata = imm5 + va;
+        end
+        
+        // Add, f = 1
+        5'b00001: begin
+            rfen = 1;
+            rfdata = va + vb;
+    	end
              
-            // Slt, f = 0
-            5'b00100: begin
-                rfen = 1;
-                rfdata = (va < imm5);
-            end
-             
-            // Slt, f = 1
-            5'b00101: begin
-                rfen = 1;
-                rfdata = (va < vb);
-            end
+        // Slt, f = 0
+        5'b00100: begin
+            rfen = 1;
+            rfdata = (va < imm5);
+        end
+         
+        // Slt, f = 1
+        5'b00101: begin
+            rfen = 1;
+            rfdata = (va < vb);
+        end
             
-            // Lea, f = 0
-            5'b11000: begin
-                rfen = 1;
-                rfdata = va + imm5;
-            end
+        // Lea, f = 0
+        5'b11000: begin
+            rfen = 1;
+            rfdata = va + imm5;
+        end
             
-            // Lea, f = 1
-            5'b11001: begin
-                rfen = 1;
-                rfdata = pc + imm8;
-            end
+        // Lea, f = 1
+        5'b11001: begin
+            rfen = 1;
+            rfdata = pc + imm8;
+        end
             
-             // Call, f = 0
-            5'b11010: begin
-                rfen = 1;
-                rfdata = pc;
+         // Call, f = 0
+        5'b11010: begin
+            rfen = 1;
+            rfdata = pc;
+            nextpc = va + imm5;
+        end
+            
+        // Call, f = 1
+        5'b11011: begin
+            rfen = 1;
+            rfdata = pc;
+            nextpc = pc + imm8;
+        end
+            
+        // brz, f = 0
+        5'b11110: begin
+            if (vd == 0)
                 nextpc = va + imm5;
-            end
+        end
             
-            // Call, f = 1
-            5'b11011: begin
-                rfen = 1;
-                rfdata = pc;
+        //brazos, f = 1
+        5'b11111: begin
+            if (vd == 0)
                 nextpc = pc + imm8;
-            end
+        end
             
-            // brz, f = 0
-            5'b11110: begin
-                if (vd == 0)
-                    nextpc = va + imm5;
-            end
-            
-            //brazos, f = 1
-            5'b11111: begin
-                if (vd == 0)
-                    nextpc = pc + imm8;
-            end
-            
-            //shell, f = 0
-            5'b10000: begin
-                rfen = 1;
-                rfdata = va << imm5[3:0];
-            end
+        //shell, f = 0
+        5'b10000: begin
+            rfen = 1;
+            rfdata = va << imm5[3:0];
+        end
 				
-				//shell, f = 1
-            5'b10001: begin
-                rfen = 1;
-                rfdata = va << imm5[3:0];
-            end
+    	//shell, f = 1
+        5'b10001: begin
+            rfen = 1;
+            rfdata = va << imm5[3:0];
+        end
 				
-        endcase
-    end
+    endcase
+end
 	 
-	 wire clk = KEY[0];        // single step using key0
+wire clk = KEY[0];        // single step using key0
 	 
-	 ///////////////////
-         // debug support //
-	 ///////////////////
-         reg [15:0]debug;
-	 assign LEDG = inst[15:8];
-	 assign LEDR = pc[9:0];
-     display(debug[15:12], HEX3);
-     display(debug[11:8], HEX2);
-     display(debug[7:4], HEX1);
-     display(debug[3:0], HEX0);
+///////////////////
+// debug support //
+///////////////////
+reg [15:0]debug;
+assign LEDG = inst[15:8];
+assign LEDR = pc[9:0];
+display(debug[15:12], HEX3);
+display(debug[11:8], HEX2);
+display(debug[7:4], HEX1);
+display(debug[3:0], HEX0);
 
-  	 // what do we display
-	 always @(*) begin
-	     if (SW[3]) debug = pc;
-             else debug = regs[SW[2:0]];
-	 end
+// what do we display
+always @(*) begin
+    if (SW[3]) debug = pc;
+    else debug = regs[SW[2:0]];
+end
 
-
+/////////////////////////
+// The sequential part //
+/////////////////////////
 	 
-	 /////////////////////////
-	 // The sequential part //
-	 /////////////////////////
-	 
-	 always @(posedge clk) begin
-             pc <= nextpc;
-             if (rfen && rd != 7) regs[rd] <= rfdata;
-	 end
-
+always @(posedge clk) begin
+    pc <= nextpc;
+    if (rfen && rd != 7) regs[rd] <= rfdata;
+end
 
 endmodule
-
 
 module display(NUM, HEX);
 	input[3:0] NUM;
@@ -264,7 +254,6 @@ module display(NUM, HEX);
 	output[6:0] HEX;
 	reg[6:0] HEX;
 
-	
 	always @(*)
 	case (NUM)
 		4'h0 : HEX = 7'b1000000;
@@ -295,16 +284,15 @@ module sine_extenz(IN, OUT);
     reg [15:0] all1 = 16'hffff;
     reg [15:0] all0 = 16'h0;
     
-	 always @(*)
-    if (IN[SIZZ - 1]) begin
-        result[SIZZ - 1:0] = IN;
-        result[15:SIZZ] = all1[15:SIZZ];
-    end else begin
-        result[SIZZ - 1:0] = IN;
-        result[15:SIZZ] = all0[15:SIZZ];
-    end
+    always @(*)
+        if (IN[SIZZ - 1]) begin
+            result[SIZZ - 1:0] = IN;
+            result[15:SIZZ] = all1[15:SIZZ];
+        end else begin
+            result[SIZZ - 1:0] = IN;
+            result[15:SIZZ] = all0[15:SIZZ];
+        end
     
     assign OUT = result;
     
 endmodule
-
