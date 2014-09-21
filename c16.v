@@ -85,11 +85,11 @@ output		     [6:0]		HEX3;
             16'h0004: inst = 16'h2901; // r1 = (r0 < r1) (r1 should now be 0)
             16'h0005: inst = 16'hf905; // pc = pc + 5 if r1 == 0 (should set pc to 0xa)
             16'h000a: inst = 16'hd2ef; // r2 = pc (0xa); pc = r7 + 15 (15 since r7 is always 0)
-            16'h000e: inst = 16'hda0a; // r2 = pc (0xe); pc = pc + 10
-            16'h0019: inst = 16'hc342; // r3 = r2 + 2 (r3 = 0x10)
+            16'h000f: inst = 16'hda0a; // r2 = pc (0xe); pc = pc + 10
+            16'h0019: inst = 16'hc342; // r3 = r2 + 2 (r3 = 0x11)
             16'h001a: inst = 16'hcb01; // r3 = pc + 1 (r3 = 0x1b)
             16'h001b: inst = 16'h8464; // r4 = r3 << 4 (r4 = 0x1b0)
-            16'h001c: inst = 16'h8d48; // r5 = r2 << 8 (r5 = 0xe00)
+            16'h001c: inst = 16'h8d48; // r5 = r2 << 8 (r5 = 0xf00)
             16'h001d: inst = 16'h8f48; // r7 = r2 << 8 (r7 should remain 0 since it is the zero register)
             default: inst = 16'bxxxxxxxxxxxxxxxx;
         endcase
@@ -190,7 +190,13 @@ always @(*) begin
         end
             
         // shl, f = 0
-        5'b1000x: begin
+        5'b10000: begin
+            rfen = 1;
+            rfdata = va << imm5[3:0];
+        end
+		  
+		  // shl, f = 1
+        5'b10001: begin
             rfen = 1;
             rfdata = va << imm5[3:0];
         end
