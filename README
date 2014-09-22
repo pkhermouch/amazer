@@ -1,21 +1,33 @@
-Due date: Sunday 9/21/2014 @11:59pm
+Due date: Sunday 9/28/2014 @11:59pm
 
-Objective: Implement a simple instruction set
+Objective: Learn how to work with memory and how to implement state machines
 
 Assignment: 
 
-Implement a subset of the C16 instruction set in Verilog. Next week, we'll
-start working with 16cubed and understand the subtle differences in
-implementation.
+Improve your c16 implementation by:
 
-You also need to embed your own own unit tests in your
-design. Please feel free to share unit tests with the class.
+    - removing the embedded program hack and using actual memory
+    - add memory instructions (ld, st)
+    - have a multi-cycle implementation
 
-- We have no program memory, the program needs to be embedded in your design
-  as combinational logic. This impacts build time so keep your programs small
+The processor can be in one of 6 states:
 
-- We have no data memory, let's skip the load and store instructions for this
-  assignment. Treat them as noops
+    (I) The initial state. Initializes the PC to 0.
+    (F) The fetch state. Fetches the next instruction from memory.
+    (D) The decode state. Parses the instruction and gets register and
+        immediate operands
+    (X) Perform any arithmetic or logic operations
+    (M) Perform any memory operations
+    (W) Updates the register file and computes the next PC
+    
+
+Your memory should be:
+
+    - word (16 bit) addressable
+    - registered
+    - 1024K words
+    - initialized from a file called memory.mif
+
 
 - We need to single-step through programs, Let's use KEY0 as a clock.
 
@@ -26,9 +38,10 @@ design. Please feel free to share unit tests with the class.
     - lea (f=0, f=1)
     - call (f=0, f=1)
     - brz (f=0, f=1)
-    - shl (f=0, f=1)   // no mul, both forms are shifts
+    - ld (f=0, f=1)
+    - st (f=0, f=1)
 
-- We'll pick the most creative tests and use them to test everyone's code
+- Please continue to develop and share unit tests
 
 - the hex display depends on the position of the SW[4:0]
 
@@ -36,5 +49,11 @@ design. Please feel free to share unit tests with the class.
     - 1000   => show the current instruction
 
 - LDER[9:0] display the 10 least significant bits of the PC
-- LEDG[7:0] display the 8 most significant bits of the current instruction
+
+- LEDG[0] I-state
+- LEDG[1] F-state
+- LEDG[2] D-state
+- LEDG[3] X-state
+- LEDG[4] M-state
+- LEDG[5] W-state
 
