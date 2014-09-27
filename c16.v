@@ -26,7 +26,13 @@ module c16(
 //=======================================================
 //  PARAMETER declarations
 //=======================================================
-
+	 // Not sure if these should be 4'
+	 parameter I = 3'h0;
+    parameter F = 3'h1;
+    parameter D = 3'h2;
+    parameter X = 3'h3;
+    parameter M = 3'h4;
+    parameter W = 3'h5;
 
 //=======================================================
 //  PORT declarations
@@ -56,7 +62,8 @@ output		     [6:0]		HEX3;
 	 
     reg [15:0]regs[7:0];     // register
     reg [15:0]pc;             // the pc
-	 
+	 reg [2:0]cur_state = I;
+	 reg [2:0]next_state;
 	initial begin
 		pc = 0;
 		regs[0] = 0;
@@ -188,19 +195,26 @@ always @(*) begin
             if (vd == 0)
                 nextpc = pc + imm8;
         end
-            
-        // shl, f = 0
-        5'b10000: begin
-            rfen = 1;
-            rfdata = va << imm5[3:0];
-        end
 		  
-		  // shl, f = 1
-        5'b10001: begin
-            rfen = 1;
-            rfdata = va << imm5[3:0];
-        end
-				
+		  // ld, f = 0
+		  5'b10100: begin
+		  
+		  end
+		  
+		  // ld, f = 1
+		  5'b10101: begin
+		  
+		  end
+		  
+		  // st, f = 0
+		  5'b10110: begin
+		  
+		  end
+		  
+		  // st, f = 1
+		  5'b10111: begin
+		  
+		  end
     endcase
 end
 	 
@@ -210,7 +224,12 @@ wire clk = KEY[0];        // single step using key0
 // debug support //
 ///////////////////
 reg [15:0]debug;
-assign LEDG = inst[15:8];
+assign LEDG[0] = cur_state == I;
+assign LEDG[1] = cur_state == F;
+assign LEDG[2] = cur_state == D;
+assign LEDG[3] = cur_state == X;
+assign LEDG[4] = cur_state == M;
+assign LEDG[5] = cur_state == W;
 assign LEDR = pc[9:0];
 display(debug[15:12], HEX3);
 display(debug[11:8], HEX2);
@@ -219,7 +238,7 @@ display(debug[3:0], HEX0);
 
 // what do we display
 always @(*) begin
-    if (SW[3]) debug = pc;
+    if (SW[3]) debug = inst;
     else debug = regs[SW[2:0]];
 end
 
