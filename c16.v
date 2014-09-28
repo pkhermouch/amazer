@@ -29,6 +29,8 @@ module c16(
 	 // Not sure if these should be 4'
 	 parameter I = 3'h0;
     parameter F = 3'h1;
+	 parameter F1 = 3'h6;
+	 parameter F2 = 3'h7;
     parameter D = 3'h2;
     parameter X = 3'h3;
     parameter M = 3'h4;
@@ -99,14 +101,10 @@ output		     [6:0]		HEX3;
 // fetch //
 ///////////
 	 
-	 reg [15:0]mem_addr;
-	 reg [15:0]mem_input;
 	 reg mem_wren;
-	 reg [15:0]next_mem_addr;
-	 reg [15:0]next_mem_input;
 	 reg next_mem_wren;
 	 wire [15:0]mem_out;
-	 ram (mem_addr, clk, mem_input, mem_wren, mem_out);
+	 ram ((next_state == F) ? pc : pc, clk, vd, mem_wren, mem_out);
 	 
 	///////////////////
 	// decode & regs //
@@ -120,15 +118,15 @@ output		     [6:0]		HEX3;
 	 reg [3:0]next_x_op;
 	 reg [3:0]next_m_op;
 	 reg [3:0]next_wb_op;
-    wire [4:0] opcode = inst[15:11];
+    wire [4:0] opcode = mem_out[15:11];
     wire [2:0] rd = inst[10:8];
-    wire [2:0] ra = inst[7:5];
-    wire [2:0] rb = inst[2:0];
+    wire [2:0] ra = mem_out[7:5];
+    wire [2:0] rb = mem_out[2:0];
     // Immediate values, sign extended using our custom module
 	 wire [15:0]imm5;
 	 wire [15:0]imm8;
-    sign_extend_16 #(5) (inst[4:0], imm5);
-    sign_extend_16 #(8) (inst[7:0], imm8);
+    sign_extend_16 #(5) (mem_out[4:0], imm5);
+    sign_extend_16 #(8) (mem_out[7:0], imm8);
     // Values loaded from registers
     wire [15:0] va = regs[ra];
     wire [15:0] vb = regs[rb];
@@ -236,6 +234,9 @@ always @(*) begin
 					next_xv_1 = imm5;
 					if (vd == 0)
 						 next_wb_op = WB_PC;
+					else
+						 next_wb_op = NOP;
+					
 			  end
 					
 			  // brz, f = 1
@@ -246,6 +247,8 @@ always @(*) begin
 					next_xv_1 = imm8;
 					if (vd == 0)
 						 next_wb_op = WB_PC;
+					else
+						 next_wb_op = NOP;
 			  end
 			  
 			  // ld, f = 0
@@ -300,7 +303,6 @@ always @(*) begin
 		W: begin
 		end
 	 endcase
-    
 end
 	 
 	 
@@ -309,7 +311,7 @@ end
 ///////////////////
 reg [15:0]debug;
 assign LEDG[0] = cur_state == I;
-assign LEDG[1] = cur_state == F;
+assign LEDG[1] = (cur_state == F) | (cur_state == F1) | (cur_state == F2);
 assign LEDG[2] = cur_state == D;
 assign LEDG[3] = cur_state == X;
 assign LEDG[4] = cur_state == M;
@@ -331,18 +333,45 @@ end
 /////////////////////////
 	 
 always @(posedge clk) begin
+		/* Manual latches
+		cur_state <= cur_state;
+		next_state <= next_state;
+		inst <= inst;
+		m_op <= m_op;
+		x_op <= x_op;
+		xv_0 <= xv_0;
+		xv_1 <= xv_1;
+		wb_op <= wb_op;
+		xv_out <= xv_out;
+		mem_input <= mem_input;
+		mem_wren <= 0;
+		rfdata <= rfdata;
+		*/
+		
+	 if (!CPU_RESET_n) begin
+		next_state <= F;
+		cur_state <= I;
+		pc = 0;
+		regs[0] = 0;
+		regs[1] = 0;
+		regs[2] = 0;
+		regs[3] = 0;
+		regs[4] = 0;
+		regs[5] = 0;
+		regs[6] = 0;
+		inst <= 0;
+	 end else
 	 case (cur_state)
 		I: begin
-			mem_addr <= pc;
 			cur_state <= F;
 			next_state <= D;
 		end
 		F: begin
-			inst <= mem_out;
 			cur_state <= D;
 			next_state <= X;
 		end
 		D: begin
+			inst <= mem_out;
 			m_op <= next_m_op;
 			x_op <= next_x_op;
 			xv_0 <= next_xv_0;
@@ -355,11 +384,10 @@ always @(posedge clk) begin
 			xv_out <= next_xv_out;
 			case (m_op)
 				MEM_LD: begin
-					mem_addr <= next_xv_out;
+					xv_out <= next_xv_out;
 				end
 				MEM_ST: begin
-					mem_addr <= next_xv_out;
-					mem_input <= vd;
+					xv_out <= next_xv_out;
 					mem_wren <= 1;
 				end
 			endcase
@@ -375,12 +403,8 @@ always @(posedge clk) begin
 			endcase
 			cur_state <= W;
 			next_state <= F;
-		end
-		W: begin
-			// If the target is R7, don't write out the value
 			case (wb_op)
 				WB_REG: begin
-					if (rd != 7) regs[rd] <= rfdata;
 					pc <= pc + 1;
 				end
 				WB_PC: begin
@@ -390,7 +414,18 @@ always @(posedge clk) begin
 					pc <= pc + 1;
 				end
 			endcase
-			mem_addr <= pc;
+		end
+		W: begin
+			// If the target is R7, don't write out the value
+			case (wb_op)
+				WB_REG: begin
+					if (rd != 7) regs[rd] <= rfdata;
+				end
+				WB_PC: begin
+				end
+				NOP: begin
+				end
+			endcase
 			cur_state <= F;
 			next_state <= D;
 		end
