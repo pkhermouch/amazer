@@ -1,0 +1,30 @@
+
+State Machine - |c16|cur_state
+Name cur_state.W cur_state.M cur_state.X cur_state.D cur_state.F cur_state.I 
+cur_state.I 0 0 0 0 0 0 
+cur_state.F 0 0 0 0 1 1 
+cur_state.D 0 0 0 1 0 1 
+cur_state.X 0 0 1 0 0 1 
+cur_state.M 0 1 0 0 0 1 
+cur_state.W 1 0 0 0 0 1 
+
+State Machine - |c16|wb_op
+Name wb_op.WB_REG wb_op.NOP wb_op.WB_PC 
+wb_op.WB_REG 0 0 0 
+wb_op.WB_PC 1 0 1 
+wb_op.NOP 1 1 0 
+
+State Machine - |c16|x_op
+Name x_op.SHFT x_op.NOP x_op.SET x_op.MUL x_op.SUB x_op.ADD 
+x_op.ADD 0 0 0 0 0 0 
+x_op.SUB 0 0 0 0 1 1 
+x_op.MUL 0 0 0 1 0 1 
+x_op.SET 0 0 1 0 0 1 
+x_op.NOP 0 1 0 0 0 1 
+x_op.SHFT 1 0 0 0 0 1 
+
+State Machine - |c16|m_op
+Name m_op.MEM_LD m_op.NOP m_op.MEM_ST 
+m_op.MEM_LD 0 0 0 
+m_op.MEM_ST 1 0 1 
+m_op.NOP 1 1 0 
