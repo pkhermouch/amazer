@@ -102,6 +102,9 @@ output		     [6:0]		HEX3;
 	 reg [15:0]mem_addr;
 	 reg [15:0]mem_input;
 	 reg mem_wren;
+	 reg [15:0]next_mem_addr;
+	 reg [15:0]next_mem_input;
+	 reg next_mem_wren;
 	 wire [15:0]mem_out;
 	 ram (mem_addr, clk, mem_input, mem_wren, mem_out);
 	 
@@ -133,8 +136,10 @@ output		     [6:0]		HEX3;
 	 // Values for execute stage
 	 reg [15:0]next_xv_0;
 	 reg [15:0]next_xv_1;
+	 reg [15:0]next_xv_out;
 	 reg [15:0]xv_0;
 	 reg [15:0]xv_1;
+	 reg [15:0]xv_out;
  
 /////////////
 // execute //
@@ -144,17 +149,10 @@ reg [15:0] nextpc;        // the next pc
 reg [15:0]rfdata;         // the register value
  
 always @(*) begin
-    next_wb_op = NOP;
-    rfdata = 0;
-    nextpc = pc + 1;
-	 mem_wren = 0;
-	 mem_input = 0;
-	 
 	 case (next_state)
 		I: begin
 		end
 		F: begin
-			mem_addr = pc;
 		end
 		D: begin
 			case (opcode)
@@ -290,26 +288,12 @@ always @(*) begin
 		X: begin
 			case (x_op)
 				ADD: begin
-				end
-				SUB: begin
-				end
-				MUL: begin
+					next_xv_out = xv_0 + xv_1;
 				end
 				NOP: begin
 				end
 				SET: begin
-				end
-				SHFT: begin
-				end
-			endcase
-		end
-		M: begin
-			case (m_op)
-				MEM_ST: begin
-				end
-				MEM_LD: begin
-				end
-				NOP: begin
+					next_xv_out = xv_0 < xv_1;
 				end
 			endcase
 		end
@@ -349,9 +333,14 @@ end
 always @(posedge clk) begin
 	 case (cur_state)
 		I: begin
+			mem_addr <= pc;
+			cur_state <= F;
+			next_state <= D;
 		end
 		F: begin
 			inst <= mem_out;
+			cur_state <= D;
+			next_state <= X;
 		end
 		D: begin
 			m_op <= next_m_op;
@@ -359,27 +348,53 @@ always @(posedge clk) begin
 			xv_0 <= next_xv_0;
 			xv_1 <= next_xv_1;
 			wb_op <= next_wb_op;
+			cur_state <= X;
+			next_state <= M;
 		end
 		X: begin
+			xv_out <= next_xv_out;
+			case (m_op)
+				MEM_LD: begin
+					mem_addr <= next_xv_out;
+				end
+				MEM_ST: begin
+					mem_addr <= next_xv_out;
+					mem_input <= vd;
+					mem_wren <= 1;
+				end
+			endcase
+			cur_state <= M;
+			next_state <= W;
 		end
 		M: begin
+			mem_wren <= 0;
+			case (m_op)
+				MEM_LD: begin
+					rfdata <= mem_out;
+				end
+			endcase
+			cur_state <= W;
+			next_state <= F;
 		end
 		W: begin
 			// If the target is R7, don't write out the value
 			case (wb_op)
 				WB_REG: begin
 					if (rd != 7) regs[rd] <= rfdata;
+					pc <= pc + 1;
 				end
 				WB_PC: begin
 					pc <= rfdata;
 				end
 				NOP: begin
+					pc <= pc + 1;
 				end
 			endcase
+			mem_addr <= pc;
+			cur_state <= F;
+			next_state <= D;
 		end
 	 endcase
-    cur_state <= next_state;
-    
 end
 
 endmodule
