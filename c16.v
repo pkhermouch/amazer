@@ -42,7 +42,7 @@ module c16(
     parameter SET = 4'h3;
     parameter NOP = 4'h4;
     parameter SHFT = 4'h5;
-    parameter CMP = 4'h5;
+    parameter CMP = 4'h6;
 	 // Memory ops
 	 parameter MEM_LD = 4'h0;
 	 parameter MEM_ST = 4'h1;
@@ -118,15 +118,13 @@ output		     [6:0]		HEX3;
 	 reg [3:0]next_x_op;
 	 reg [3:0]next_m_op;
 	 reg [3:0]next_wb_op;
-    wire [4:0] opcode = mem_out[15:11];
+    wire [4:0] opcode = inst[15:11];
     wire [2:0] rd = inst[10:8];
-    wire [2:0] ra = mem_out[7:5];
-    wire [2:0] rb = mem_out[2:0];
+    wire [2:0] ra = inst[7:5];
+    wire [2:0] rb = inst[2:0];
     // Immediate values, sign extended using our custom module
-	 wire [15:0]imm5;
-	 wire [15:0]imm8;
-    sign_extend_16 #(5) (mem_out[4:0], imm5);
-    sign_extend_16 #(8) (mem_out[7:0], imm8);
+	 wire [15:0]imm5 = $signed(mem_out[4:0]);
+	 wire [15:0]imm8 = $signed(mem_out[7:0]);
     // Values loaded from registers
     wire [15:0] va = regs[ra];
     wire [15:0] vb = regs[rb];
@@ -138,6 +136,7 @@ output		     [6:0]		HEX3;
 	 reg [15:0]xv_0;
 	 reg [15:0]xv_1;
 	 reg [15:0]xv_out;
+	 reg [2:0] next_rd;
  
 /////////////
 // execute //
@@ -311,7 +310,7 @@ end
 ///////////////////
 reg [15:0]debug;
 assign LEDG[0] = cur_state == I;
-assign LEDG[1] = (cur_state == F) | (cur_state == F1) | (cur_state == F2);
+assign LEDG[1] = cur_state == F;
 assign LEDG[2] = cur_state == D;
 assign LEDG[3] = cur_state == X;
 assign LEDG[4] = cur_state == M;
@@ -324,8 +323,24 @@ display(debug[3:0], HEX0);
 
 // what do we display
 always @(*) begin
-    if (SW[3]) debug = inst;
-    else debug = regs[SW[2:0]];
+    if (SW[3]) begin
+		debug = inst;
+    end else if(SW[9]) begin
+			debug = xv_out;
+	end else if(SW[6]) begin
+			debug = imm8;
+	end else if(SW[7]) begin
+			debug = imm5;
+	 end else if(SW[5]) begin
+			debug[15:8] = xv_0;
+			debug[7:0] = xv_1;
+	 end else if(SW[8]) begin
+			debug[15:12] = rd;
+			debug[11:8] = ra;
+			debug[7:4] = rb;
+	 end else begin
+		debug = regs[SW[2:0]];
+		end
 end
 
 /////////////////////////
@@ -333,20 +348,6 @@ end
 /////////////////////////
 	 
 always @(posedge clk) begin
-		/* Manual latches
-		cur_state <= cur_state;
-		next_state <= next_state;
-		inst <= inst;
-		m_op <= m_op;
-		x_op <= x_op;
-		xv_0 <= xv_0;
-		xv_1 <= xv_1;
-		wb_op <= wb_op;
-		xv_out <= xv_out;
-		mem_input <= mem_input;
-		mem_wren <= 0;
-		rfdata <= rfdata;
-		*/
 		
 	 if (!CPU_RESET_n) begin
 		next_state <= F;
@@ -370,6 +371,7 @@ always @(posedge clk) begin
 			cur_state <= D;
 			next_state <= X;
 		end
+		
 		D: begin
 			inst <= mem_out;
 			m_op <= next_m_op;
@@ -379,16 +381,21 @@ always @(posedge clk) begin
 			wb_op <= next_wb_op;
 			cur_state <= X;
 			next_state <= M;
+			next_rd <= rd;
 		end
 		X: begin
-			xv_out <= next_xv_out;
 			case (m_op)
 				MEM_LD: begin
 					xv_out <= next_xv_out;
+					mem_wren <= 0;
 				end
 				MEM_ST: begin
 					xv_out <= next_xv_out;
 					mem_wren <= 1;
+				end
+				NOP: begin
+					xv_out <= next_xv_out;
+					mem_wren <= 0;
 				end
 			endcase
 			cur_state <= M;
@@ -399,6 +406,9 @@ always @(posedge clk) begin
 			case (m_op)
 				MEM_LD: begin
 					rfdata <= mem_out;
+				end
+				NOP: begin
+				   rfdata <= xv_out;
 				end
 			endcase
 			cur_state <= W;
@@ -419,7 +429,7 @@ always @(posedge clk) begin
 			// If the target is R7, don't write out the value
 			case (wb_op)
 				WB_REG: begin
-					if (rd != 7) regs[rd] <= rfdata;
+					if (rd != 7) regs[next_rd] <= rfdata;
 				end
 				WB_PC: begin
 				end
@@ -473,38 +483,4 @@ module display(NUM, HEX);
 		4'hE : HEX = 7'b0000110;
 		4'hF : HEX = 7'b0001110;
 	endcase
-endmodule
-
-
-
-
-
-
-
-
-
-
-
-// Sign extension module
-module sign_extend_16(IN, OUT);
-    // The width of the input value in bits
-    parameter INPUT_WIDTH;
-    input [INPUT_WIDTH - 1:0]IN;
-    output [15:0]OUT;
-    
-    reg [15:0] result;
-    reg [15:0] all1 = 16'hffff;
-    reg [15:0] all0 = 16'h0;
-    
-    always @(*)
-        if (IN[INPUT_WIDTH - 1]) begin
-            result[INPUT_WIDTH - 1:0] = IN;
-            result[15:INPUT_WIDTH] = all1[15:INPUT_WIDTH];
-        end else begin
-            result[INPUT_WIDTH - 1:0] = IN;
-            result[15:INPUT_WIDTH] = all0[15:INPUT_WIDTH];
-        end
-    
-    assign OUT = result;
-    
 endmodule
