@@ -118,10 +118,10 @@ output		     [6:0]		HEX3;
 	 reg [3:0]next_x_op;
 	 reg [3:0]next_m_op;
 	 reg [3:0]next_wb_op;
-    wire [4:0] opcode = inst[15:11];
-    wire [2:0] rd = inst[10:8];
-    wire [2:0] ra = inst[7:5];
-    wire [2:0] rb = inst[2:0];
+    wire [4:0] opcode = mem_out[15:11];
+    wire [2:0] rd = mem_out[10:8];
+    wire [2:0] ra = mem_out[7:5];
+    wire [2:0] rb = mem_out[2:0];
     // Immediate values, sign extended using our custom module
 	 wire [15:0]imm5 = $signed(mem_out[4:0]);
 	 wire [15:0]imm8 = $signed(mem_out[7:0]);
@@ -429,7 +429,7 @@ always @(posedge clk) begin
 			// If the target is R7, don't write out the value
 			case (wb_op)
 				WB_REG: begin
-					if (rd != 7) regs[next_rd] <= rfdata;
+					if (next_rd != 7) regs[next_rd] <= rfdata;
 				end
 				WB_PC: begin
 				end
