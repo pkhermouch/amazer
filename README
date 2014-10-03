@@ -1,33 +1,18 @@
-Due date: Sunday 9/28/2014 @11:59pm
+Due date: Sunday 10/5/2014 @11:59pm
 
-Objective: Learn how to work with memory and how to implement state machines
+Objective: build a simple pipeline with forwarding
 
 Assignment: 
 
-Improve your c16 implementation by:
+Use a simple pipeline to implement a subset of the C16 instruction set.
 
-    - removing the embedded program hack and using actual memory
-    - add memory instructions (ld, st)
-    - have a multi-cycle implementation
+The 3-stages are: F (fetch), D (decode/operands), X (execute)
 
-The processor can be in one of 6 states:
+We will make the following assumptions:
 
-    (I) The initial state. Initializes the PC to 0.
-    (F) The fetch state. Fetches the next instruction from memory.
-    (D) The decode state. Parses the instruction and gets register and
-        immediate operands
-    (X) Perform any arithmetic or logic operations
-    (M) Perform any memory operations
-    (W) Updates the register file and computes the next PC
-    
-
-Your memory should be:
-
-    - word (16 bit) addressable
-    - registered
-    - 1024K words
-    - initialized from a file called memory.mif
-
+    - no memory instructions
+    - all branch instructions will be followed by two nops
+    - need to implement forwarding
 
 - We need to single-step through programs, Let's use KEY0 as a clock.
 
@@ -37,23 +22,15 @@ Your memory should be:
     - slt (f=0; f=1)
     - lea (f=0, f=1)
     - call (f=0, f=1)
+    - shl (f=0, f=1)
     - brz (f=0, f=1)
-    - ld (f=0, f=1)
-    - st (f=0, f=1)
 
 - Please continue to develop and share unit tests
 
-- the hex display depends on the position of the SW[4:0]
+- the hex display depends on the position of the SW[3:0]
 
     - 0xxx   => show register xxx
-    - 1000   => show the current instruction
+    - 1000   => show the instruction in the D-stage
 
-- LDER[9:0] display the 10 least significant bits of the PC
-
-- LEDG[0] I-state
-- LEDG[1] F-state
-- LEDG[2] D-state
-- LEDG[3] X-state
-- LEDG[4] M-state
-- LEDG[5] W-state
+- LDER[9:0] display the 10 least significant bits of the PC in the D-stage
 
