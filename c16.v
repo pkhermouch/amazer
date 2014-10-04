@@ -488,7 +488,7 @@ module executor(clk, execute_op, arg_0, arg_1, dest_in, pc_in, dest_out, reg_val
 			end
 			BRZ: begin
 				pc_value_out_reg = arg_0 + arg_1;
-				pc_write_enable = 1;
+				pc_write_enable_reg = 1;
 			end
 		endcase
 	end
