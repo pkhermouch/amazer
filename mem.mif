@@ -1,41 +1,42 @@
 -- Final State: r0 = 2, r1 = 4, r2 = Ah, r3 = 23h, r4 = 0, r5 = 2B0h, r6 = 230h, r7 = 0 (Z) 
+-- This is Merrill Davis' test case posted on Piazza
 
-  WIDTH=16;
-  DEPTH=60;
+WIDTH=16;
+DEPTH=60;
 
-  ADDRESS_RADIX=HEX;
-  DATA_RADIX=HEX;
+ADDRESS_RADIX=HEX;
+DATA_RADIX=HEX;
 
-  CONTENT BEGIN
-  0: 0002;   -- add   r0   r0  2      r0=2
-  1: 07e2;   -- add   r7   r7  2      z=0, z is constant 
-  2: 0807;   -- add   r0   r0  r7     no change in state
-  3: 0124;   -- add   r1   r1  4      r1=4
-  4: 0a01;   -- add   r2   r0  r1     r2=6
-  5: 0a41;   -- add   r2   r2  r1     r2=Ah
-  6: 234b;   -- slt   r3   r2  11     r3=1
-  7: 2b22;   -- slt   r3   r1  r2     r3=1
-  8: 2b41;   -- slt   r3   r2  r1     r3=0
-  9: 2b61;   -- slt   r3   r3  r1     r3=1
-  A: c34f;   -- lea   r3   15         r3=19h
-  B: cb0f;   -- lea   r3   15         r3=1Bh
-  C: d56F;   -- call  r5   r3         r5=Dh, pc=002Ah
-  D: 0000;   -- nop
-  E: 0000;   -- nop
-  2A: dd03;  -- call  r5   3          r5=2Bh, pc=002Eh
-  2B: 0000;  -- nop
-  2C: 0000;  -- nop
-  2E: 04e0;  -- add   r4   r7  0      r4=0
-  2F: 0368;  -- add   r3   r3  8      r3=23h
-  30: f46f;  -- brz   r4   r3  15     pc=0032h
-  31: 0000;  -- nop
-  32: f067;  -- brz   r0   r3  7      this should have the same effect as a nop, so I'm not updating the numbers
-  33: fc03;  -- brz   r4   3          pc=0037h
-  34: 0000;  -- nop
-  35: 0000;  -- nop
-  37: f803;  -- brz   r0   3          should be 2 nops after, but it -shouldn't- change state
-  38: 8664;  -- shl   r6   r3  4      r6=230h
-  39: 85A1;  -- shl   r5   r5  1      r5=56h
-  3A: 85A3;  -- shl   r5   r5  3      r5=2B0h
-  3B: ffff;
-  END;
+CONTENT BEGIN
+    0: 0002;   -- add   r0   r0  2      r0=2
+    1: 07e2;   -- add   r7   r7  2      z=0, z is constant 
+    2: 0807;   -- add   r0   r0  r7     no change in state
+    3: 0124;   -- add   r1   r1  4      r1=4
+    4: 0a01;   -- add   r2   r0  r1     r2=6
+    5: 0a41;   -- add   r2   r2  r1     r2=Ah
+    6: 234b;   -- slt   r3   r2  11     r3=1 0010,0011,0100,1011
+    7: 2b22;   -- slt   r3   r1  r2     r3=1
+    8: 2b41;   -- slt   r3   r2  r1     r3=0
+    9: 2b61;   -- slt   r3   r3  r1     r3=1
+    A: c34f;   -- lea   r3   15         r3=19h
+    B: cb0f;   -- lea   r3   15         r3=1Bh
+    C: d56F;   -- call  r5   r3         r5=Dh, pc=002Ah 10,1010
+    D: 0000;   -- nop
+    E: 0000;   -- nop
+    2A: dd03;  -- call  r5   3          r5=2Bh, pc=002Eh 10,1110
+    2B: 0000;  -- nop
+    2C: 0000;  -- nop
+    2E: 04e0;  -- add   r4   r7  0      r4=0
+    2F: 0368;  -- add   r3   r3  8      r3=23h
+    30: f46f;  -- brz   r4   r3  15     pc=0032h
+    31: 0000;  -- nop
+    32: f067;  -- brz   r0   r3  7      this should have the same effect as a nop, so I'm not updating the numbers
+    33: fc03;  -- brz   r4   3          pc=0037h
+    34: 0000;  -- nop
+    35: 0000;  -- nop
+    37: f803;  -- brz   r0   3          should be 2 nops after, but it -shouldn't- change state
+    38: 8664;  -- shl   r6   r3  4      r6=230h
+    39: 85A1;  -- shl   r5   r5  1      r5=56h
+    3A: 85A3;  -- shl   r5   r5  3      r5=2B0h
+    3B: ffff;
+END;

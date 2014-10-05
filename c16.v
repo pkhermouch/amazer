@@ -124,7 +124,7 @@ executor(
 ///////////////////
 reg [15:0]debug;
 
-assign LEDR = fetch_pc[9:0];
+assign LEDR = next_x_pc[9:0];//fetch_pc[9:0];
 
 display(debug[15:12], HEX3);
 display(debug[11:8], HEX2);
@@ -493,19 +493,11 @@ module executor(clk, execute_op, arg_0, arg_1, dest_in, pc_in, dest_out, reg_val
 		endcase
 	end
 
-	always @(posedge clk) begin
-		dest_out_out <= dest_out_reg;
-		reg_value_out_out <= reg_value_out_reg;
-		pc_value_out_out <= pc_value_out_reg;
-		reg_write_enable_out <= reg_write_enable_reg;
-		pc_write_enable_out <= pc_write_enable_reg;
-	end
-
-	assign dest_out = dest_out_out;
-	assign reg_value_out = reg_value_out_out;
-	assign pc_value_out = pc_value_out_out;
-	assign reg_write_enable = reg_write_enable_out;
-	assign pc_write_enable = pc_write_enable_out;
+	assign dest_out = dest_out_reg;
+	assign reg_value_out = reg_value_out_reg;
+	assign pc_value_out = pc_value_out_reg;
+	assign reg_write_enable = reg_write_enable_reg;
+	assign pc_write_enable = pc_write_enable_reg;
 
 endmodule
 
