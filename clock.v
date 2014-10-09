@@ -128,7 +128,7 @@ module display(NUM, HEX);
 	endcase
 endmodule
 
-module clockDivider(CLK, INCREMENT, WRITE_ENABLE, VALUE, CLKSTATE, CLKOUT);
+module clockDivider(CLK, INCREMENT, WRITE_ENABLE, WRITE_VALUE, CLKSTATE, CLKOUT);
 parameter count = 0;
 parameter state_bits = 25;
 
