@@ -50,8 +50,10 @@ wire[15:0] reg_write_value;
 wire[2:0] reg_addr_0;
 wire[2:0] reg_addr_1;
 wire[2:0] reg_write_dest;
+wire[2:0] memory_value_dest;
 
 wire reg_write_enable;
+wire memory_value_enable;
 
 registers(
 	.clk(clk),
@@ -63,7 +65,10 @@ registers(
 	.write_enable(reg_write_enable),
 	.read_value_0(reg_0),
 	.read_value_1(reg_1),
-	.read_value_dbg(reg_dbg)
+	.read_value_dbg(reg_dbg),
+	.memory_value(memory_out),
+	.memory_value_dest(memory_value_dest), //value from decode for load isntructions
+	.memory_value_enable(memory_value_enable) //value from decode for load instructions
 	);
 
 wire memory_write_enable;
@@ -83,7 +88,7 @@ ram2 (
 	.wren_a(0),
 	.wren_b(memory_write_enable),
 	.q_a(instruction),
-	.q_b(memory_out)
+	.q_b(memory_out) // value out for load instructions
 	);
 
 wire[15:0] branch_pc;
@@ -108,7 +113,6 @@ wire[15:0] next_x_pc;
 wire[15:0] arg_0;
 wire[15:0] arg_1;
 
-
 decoder(
 	.clk(clk),
 	.instruction(instruction),
@@ -123,7 +127,9 @@ decoder(
 	.arg_1(arg_1),
 	.pc_out(next_x_pc),
 	.dest(next_x_dest),
-	.memory_write_enable(memory_write_enable)
+	.memory_write_enable(memory_write_enable),
+	.memory_value_dest(memory_value_dest),
+	.memory_value_enable(memory_value_enable)
 	);
 
 
@@ -158,7 +164,13 @@ display(debug[3:0], HEX0);
 
 // what do we display
 always @(*) begin
-   if (SW[3]) begin
+   if (SW[6]) begin
+		debug = reg_write_value;
+	end else if (SW[5]) begin
+		debug = {1'b0, memory_value_dest, memory_value_enable, 11'b0};
+	end else if (SW[4]) begin
+		debug = memory_out;
+	end else if (SW[3]) begin
 		debug = instruction;
 	end else begin
 		debug = reg_dbg;
@@ -172,27 +184,31 @@ endmodule
 /////////////////////////
 // REGISTER FILE       //
 /////////////////////////
-module registers(clk, read_addr_0, read_addr_1, read_addr_dbg, write_addr, write_value, write_enable, read_value_0, read_value_1, read_value_dbg);
+module registers(clk, read_addr_0, read_addr_1, read_addr_dbg, write_addr, write_value, 
+	write_enable, read_value_0, read_value_1, read_value_dbg, memory_value, memory_value_dest, memory_value_enable);
 
-	input[3:0] read_addr_0;
-	input[3:0] read_addr_1;
-	input[3:0] read_addr_dbg;
-	input[3:0] write_addr;
-
+	input[2:0] read_addr_0;
+	input[2:0] read_addr_1;
+	input[2:0] read_addr_dbg;
+	input[2:0] write_addr;
+	input[2:0] memory_value_dest;
+	
 	input write_enable;
 	input clk;
+	input memory_value_enable;
 
 	input[15:0] write_value;
+	input[15:0] memory_value;
 
 	output[15:0] read_value_0;
 	output[15:0] read_value_1;
 	output[15:0] read_value_dbg;
-
+	
 	reg[15:0] rv0;
 	reg[15:0] rv1;
 	reg[15:0] rvdbg;
 
-	reg [15:0]regs[8:0];
+	reg [15:0]regs[7:0];
 	initial begin
 		regs[0] = 0;
 		regs[1] = 0;
@@ -202,8 +218,6 @@ module registers(clk, read_addr_0, read_addr_1, read_addr_dbg, write_addr, write
 		regs[5] = 0;
 		regs[6] = 0;
 		regs[7] = 0;
-		// Magic memory_addr register for ld/st micro-ops
-		regs[8] = 0; 
 	end
 
 	always @(*) begin
@@ -221,11 +235,25 @@ module registers(clk, read_addr_0, read_addr_1, read_addr_dbg, write_addr, write
 				rvdbg = write_value;
 			end
 		end
+		if (memory_value_enable && memory_value_dest != 7) begin
+			if (memory_value_dest == read_addr_0) begin
+				rv0 = memory_value;
+			end
+			if (memory_value_dest == read_addr_1) begin
+				rv1 = memory_value;
+			end
+			if (memory_value_dest == read_addr_dbg) begin
+				rvdbg = memory_value;
+			end
+		end
 	end
 
 	always @(posedge clk) begin
 		if (write_enable && write_addr != 7) begin
 			regs[write_addr] <= write_value;
+		end
+		if (memory_value_enable && memory_value_dest != 7) begin
+			regs[memory_value_dest] <= memory_value;
 		end
 	end
 
@@ -261,15 +289,15 @@ module fetcher(clk, pc_write_enable, pc_in, stall, next_pc, pc_out);
 	always @(*) begin
 		if(pc_write_enable == 1) begin
 			next_fetch_pc = pc_in;
+		end else if (stall) begin
+			next_fetch_pc = fetch_pc;
 		end else begin
 			next_fetch_pc = fetch_pc + 1;
 		end
 	end
 
 	always @(posedge clk) begin
-		if (!stall) begin
-			fetch_pc <= next_fetch_pc;
-		end
+		fetch_pc <= next_fetch_pc;
 	end
 
 	assign next_pc = next_fetch_pc;
@@ -280,7 +308,8 @@ endmodule
 /////////////////////////
 // DECODE STAGE        //
 /////////////////////////
-module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, stall, reg_addr_0, reg_addr_1, arg_0, arg_1, pc_out, dest, memory_write_enable);
+module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, stall, reg_addr_0, reg_addr_1,
+	arg_0, arg_1, pc_out, dest, memory_write_enable, memory_value_dest, memory_value_enable);
 
 	// Execute stage's parameters
 	parameter ADD = 4'h0;
@@ -292,6 +321,7 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, stall, reg_add
 	// Decode stage's parameters for micro-ops
 	parameter LD = 4'h6;
 	parameter ST = 4'h7;
+	parameter LD_WB = 4'h8;
 
 	input clk;
 
@@ -306,29 +336,41 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, stall, reg_add
 	
 	output stall;
 
-	output[3:0] dest;
+	output[2:0] dest;
 	output[3:0] execute_op;
-	output[3:0] reg_addr_0;
-	output[3:0] reg_addr_1;
+	output[2:0] reg_addr_0;
+	output[2:0] reg_addr_1;
+	
+	output[15:0] memory_value_dest;
+	output memory_value_enable;
+	output memory_write_enable;
 
 	reg[3:0] execute_op_reg;
 	reg[15:0] arg_0_reg;
 	reg[15:0] arg_1_reg;
 	reg[15:0] pc_out_reg;
-	reg[3:0] dest_reg;
+	reg[2:0] dest_reg;
+	reg[15:0] memory_value_dest_reg;
+	reg memory_value_enable_reg;
+	reg memory_write_enable_reg;
 
 	reg[3:0] execute_op_out;
 	reg[15:0] arg_0_out;
 	reg[15:0] arg_1_out;
 	reg[15:0] pc_out_out;
-	reg[3:0] dest_out;
+	reg[2:0] dest_out;
+	reg[15:0] memory_value_dest_out;
+	reg memory_value_enable_out;
 
 	// Used to implement brz
-	reg[3:0] reg_addr_1_reg;
+	reg[2:0] reg_addr_1_reg;
 	
 	// Used for micro-ops
 	reg[3:0] next_decode_op;
 	reg[3:0] decode_op;
+	reg[2:0] decode_op_rd;
+	
+	reg stall_reg;
 	
 	initial begin
 		decode_op = NOP;
@@ -348,6 +390,10 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, stall, reg_add
 		arg_0_reg = 0;
 		arg_1_reg = 0;
 		reg_addr_1_reg = instruction[2:0];
+		stall_reg = 0;
+		memory_value_dest_reg = 7;
+		memory_value_enable_reg = 0;
+		memory_write_enable_reg = 0;
 		case (opcode)
 			// Add, f = 0
 			5'b00000: begin
@@ -444,8 +490,9 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, stall, reg_add
 				execute_op_reg = ADD;
 				arg_0_reg = reg_0;
 				arg_1_reg = imm5;
-				dest_reg = 8;
+				dest_reg = 7;
 				next_decode_op = LD;
+				stall_reg = 1;
 			end
 			
 			// ld, f = 1
@@ -453,8 +500,9 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, stall, reg_add
 				execute_op_reg = ADD;
 				arg_0_reg = pc_in;
 				arg_1_reg = imm8;
-				dest_reg = 8;
+				dest_reg = 7;
 				next_decode_op = LD;
+				stall_reg = 1;
 			end
 			
 			// st, f = 0
@@ -462,8 +510,9 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, stall, reg_add
 				execute_op_reg = ADD;
 				arg_0_reg = reg_0;
 				arg_1_reg = imm5;
-				dest_reg = 8;
+				dest_reg = 7;
 				next_decode_op = ST;
+				stall_reg = 1;
 			end
 			
 			//st, f = 1
@@ -471,8 +520,9 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, stall, reg_add
 				execute_op_reg = ADD;
 				arg_0_reg = pc_in;
 				arg_1_reg = imm8;
-				dest_reg = 8;
+				dest_reg = 7;
 				next_decode_op = ST;
+				stall_reg = 1;
 			end
 		endcase
 		
@@ -482,16 +532,33 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, stall, reg_add
 			
 			// if either of these are true then the address is in R8 and it is ready
 			LD: begin
-				reg_addr_1_reg = rd;
+				execute_op_reg = NOP;
+				next_decode_op = LD_WB;
+				stall_reg = 1;
 			end
 			ST: begin
-				reg_addr_1_reg = rd;
+				execute_op_reg = NOP;
+				next_decode_op = NOP;
+				reg_addr_1_reg = decode_op_rd;
+				memory_write_enable_reg = 1;
+				stall_reg = 0;
+			end
+			
+			// we started reading last cycle and the memory is about to be ready
+			LD_WB: begin
+				execute_op_reg = NOP;
+				next_decode_op = NOP;
+				memory_value_dest_reg = decode_op_rd;
+				memory_value_enable_reg = 1;
+				stall_reg = 0;
 			end
 		endcase
 	end
 
 	assign reg_addr_0 = instruction[7:5];
 	assign reg_addr_1 = reg_addr_1_reg;
+	assign stall = stall_reg;
+	assign memory_write_enable = memory_write_enable_reg;
 
 	always @(posedge clk) begin
 		arg_0_out <= arg_0_reg;
@@ -504,6 +571,13 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, stall, reg_add
 		pc_out_out <= pc_out_reg;
 		dest_out <= dest_reg;
 		decode_op <= next_decode_op;
+		memory_value_dest_out <= memory_value_dest_reg;
+		memory_value_enable_out <= memory_value_enable_reg;
+		if(next_decode_op == LD || next_decode_op == ST) begin
+			decode_op_rd <= rd;
+		end else begin
+			decode_op_rd <= decode_op_rd;
+		end
 	end
 
 	assign arg_0 = arg_0_out;
@@ -511,6 +585,8 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, stall, reg_add
 	assign execute_op = execute_op_out;
 	assign pc_out = pc_out_out;
 	assign dest = dest_out;
+	assign memory_value_dest = memory_value_dest_out;
+	assign memory_value_enable = memory_value_enable_out;
 
 
 endmodule
@@ -531,25 +607,25 @@ module executor(clk, execute_op, arg_0, arg_1, dest_in, pc_in, dest_out, reg_val
 	input clk;
 
 	input[3:0] execute_op;
-	input[3:0] dest_in;
+	input[2:0] dest_in;
 
 	input[15:0] arg_0;
 	input[15:0] arg_1;
 	input[15:0] pc_in;
 
-	reg[3:0] dest_out_reg;
+	reg[2:0] dest_out_reg;
 	reg[15:0] reg_value_out_reg;
 	reg[15:0] pc_value_out_reg;
 	reg reg_write_enable_reg;
 	reg pc_write_enable_reg;
 
-	reg[3:0] dest_out_out;
+	reg[2:0] dest_out_out;
 	reg[15:0] reg_value_out_out;
 	reg[15:0] pc_value_out_out;
 	reg reg_write_enable_out;
 	reg pc_write_enable_out;
 
-	output[3:0] dest_out;
+	output[2:0] dest_out;
 
 	output[15:0] reg_value_out;
 	output[15:0] pc_value_out;
