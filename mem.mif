@@ -1,20 +1,19 @@
 WIDTH=16;
-DEPTH=12;
+DEPTH=11;
 
-ADDRESS_RADIX=HEX;
+ADDRESS_RADIX=DEC;
 DATA_RADIX=HEX;
 
 CONTENT BEGIN
-0: a90a; -- ld r1 10      r1 = face
-1: a2e1; -- ld r2 r7 1    r2 = a2fe
-2: 0822; -- add r0 r1 r2  r0 = 9daf
-3: b804; -- st r0 4       
-4: 0001; -- add r0 r0 1   r0 = 9db0
-5: b0e9; -- st r0 r7 9
-6: 0000; -- nops below
-7: 0000;
-8: 0000; --               9daf stored here
-9: 0000; --               9db0 stored here
-a: 0000; 
-b: face; --               value to load
+0: 0002;
+1: 0121;
+2: f002;
+3: f7e5;
+4: a0e2;
+5: a0e3;
+6: f7e8;
+7: b1e0;
+8: b7e9;
+9: d7e0;
+10: a3e0;
 END;

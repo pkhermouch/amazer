@@ -148,14 +148,14 @@ executor(
 	);
 
 	assign memory_addr = reg_write_value;
-	assign memory_in = reg_0;
+	assign memory_in = reg_1;//reg_0;
 
 ///////////////////
 // debug support //
 ///////////////////
 reg [15:0]debug;
 
-assign LEDR = next_x_pc[9:0];//fetch_pc[9:0];
+assign LEDR = next_x_pc[9:0];
 
 display(debug[15:12], HEX3);
 display(debug[11:8], HEX2);
@@ -164,7 +164,9 @@ display(debug[3:0], HEX0);
 
 // what do we display
 always @(*) begin
-   if (SW[6]) begin
+	if (SW[7]) begin
+		debug = memory_in;
+	end else if (SW[6]) begin
 		debug = reg_write_value;
 	end else if (SW[5]) begin
 		debug = {1'b0, memory_value_dest, memory_value_enable, 11'b0};
@@ -364,6 +366,8 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, stall, reg_add
 
 	// Used to implement brz
 	reg[2:0] reg_addr_1_reg;
+	// Used to implement branching and count how many cycles we need to do nothing
+	reg[1:0] cycles_to_stall;
 	
 	// Used for micro-ops
 	reg[3:0] next_decode_op;
@@ -557,7 +561,7 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, stall, reg_add
 
 	assign reg_addr_0 = instruction[7:5];
 	assign reg_addr_1 = reg_addr_1_reg;
-	assign stall = stall_reg;
+	assign stall = stall_reg;//& (cycles_to_stall == 0);
 	assign memory_write_enable = memory_write_enable_reg;
 
 	always @(posedge clk) begin
@@ -565,18 +569,38 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, stall, reg_add
 		arg_1_out <= arg_1_reg;
 		execute_op_out <= execute_op_reg;
 		// Special case for BRZ
+		if (execute_op_reg == BRZ) begin
+			if (reg_1 != 0) begin
+				execute_op_out <= NOP;
+			end
+			else if (cycles_to_stall == 0) begin
+				cycles_to_stall <= 2'h2;
+			end
+		end
+		// If we're jumping unconditionally, set the cycles to stall to 2
+		if (execute_op_reg == CALL && cycles_to_stall == 0) begin
+			cycles_to_stall <= 2'h2;
+		end
+		/*
 		if (execute_op_reg == BRZ && reg_1 != 0) begin
 			execute_op_out <= NOP;
 		end
+		*/
 		pc_out_out <= pc_out_reg;
 		dest_out <= dest_reg;
 		decode_op <= next_decode_op;
 		memory_value_dest_out <= memory_value_dest_reg;
 		memory_value_enable_out <= memory_value_enable_reg;
-		if(next_decode_op == LD || next_decode_op == ST) begin
+		if (next_decode_op == LD || next_decode_op == ST) begin
 			decode_op_rd <= rd;
 		end else begin
 			decode_op_rd <= decode_op_rd;
+		end
+		if (cycles_to_stall > 0) begin
+			execute_op_out <= NOP;
+			decode_op_rd <= NOP;
+			memory_value_enable_out <= 0;
+			cycles_to_stall <= cycles_to_stall - 1;
 		end
 	end
 
@@ -640,6 +664,8 @@ module executor(clk, execute_op, arg_0, arg_1, dest_in, pc_in, dest_out, reg_val
 		reg_write_enable_reg = 0;
 		pc_write_enable_reg = 0;
 		case (execute_op)
+			NOP: begin
+			end
 			ADD: begin
 				reg_value_out_reg = arg_0 + arg_1;
 				reg_write_enable_reg = 1;
