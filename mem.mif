@@ -1,17 +1,19 @@
-WIDTH=32
-DEPTH=9;
+WIDTH=16;
+DEPTH=11;
 
 ADDRESS_RADIX=DEC;
 DATA_RADIX=HEX;
 
 CONTENT BEGIN
-0: 0000012b;
-1: 024f036e;
-2: 048d05ac;
-3: 0000002b;
-4: 004f006e;
-5: 008d00ac;
-6: 08000920;
-7: 0a400b60;
-8: 0c800da0;
+0: 0002;
+1: 0121;
+2: f002;
+3: f7e5;
+4: a0e2;
+5: a0e3;
+6: f7e8;
+7: b1e0;
+8: b7e9;
+9: d7e0;
+10: a3e0;
 END;

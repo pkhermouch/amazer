@@ -132,21 +132,14 @@ module c16(
     */
 
    wire [15:0]                  instruction_addr;
-   wire [15:0]                  memory_addr;
    wire [31:0]                  instruction;
-   wire [31:0]                  memory_out;
-   wire [31:0]                  memory_in;
    
-   ram2 (
-	     .address_a(instruction_addr),
-	     .address_b(memory_addr),
+   ram (
+	     .address(instruction_addr),
 	     .clock(clk),
-	     .data_a(0),
-	     .data_b(memory_in),
-	     .wren_a(0),
-	     .wren_b(memory_write_enable),
-	     .q_a(instruction),
-	     .q_b(memory_out) // value out for load instructions
+	     .data(0),
+	     .wren(0),
+	     .q(instruction),
 	     );
 
    wire [15:0]                  fetch_pc;
@@ -246,13 +239,7 @@ module c16(
 
    // what do we display
    always @(*) begin
-      if (SW[7]) begin
-	     debug = memory_in;
-      end else if (SW[6]) begin
-	     debug = reg_write_value;
-      end else if (SW[4]) begin
-	     debug = memory_out;
-      end else if (SW[3]) begin
+		if (SW[3]) begin
 	     debug = instruction;
       end else begin
 	     debug = reg_dbg;
@@ -374,7 +361,7 @@ module registers(clk, read_addr_first_0, read_addr_first_1, read_addr_second_0, 
    assign read_value_first_1 = rv_first_1_reg;
    assign read_value_second_0 = rv_second_0_reg;
    assign read_value_second_1 = rv_second_1_reg;
-   assign read_value_dbg = rv_dbg;
+   assign read_value_dbg = rv_dbg_reg;
 
 endmodule
 
@@ -453,10 +440,10 @@ module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, re
 
    reg [3:0]     execute_op_first_reg;
    reg [3:0]     execute_op_second_reg;
-   reg [15:0]    arg_0_first_reg;
-   reg [15:0]    arg_1_first_reg;
-   reg [15:0]    arg_0_second_reg;
-   reg [15:0]    arg_1_second_reg;
+   reg [15:0]    arg_first_0_reg;
+   reg [15:0]    arg_first_1_reg;
+   reg [15:0]    arg_second_0_reg;
+   reg [15:0]    arg_second_1_reg;
    reg [2:0]     dest_first_reg;
    reg [2:0]     dest_second_reg;
 
@@ -487,21 +474,20 @@ module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, re
    wire [4:0]    opcode_second = second_inst[15:11];
    wire [2:0]    rd_second = second_inst[10:8];
 
-   wire [15:0]   imm5_first = $signed(first_inst[4:0]);
-   wire [15:0]   imm8_first = $signed(first_inst[7:0]);
-   wire [15:0]   imm5_second = $signed(second_inst[4:0]);
-   wire [15:0]   imm8_second = $signed(second_inst[7:0]);
+   wire [15:0]   first_imm5 = $signed(first_inst[4:0]);
+   wire [15:0]   first_imm8 = $signed(first_inst[7:0]);
+   wire [15:0]   second_imm5 = $signed(second_inst[4:0]);
+   wire [15:0]   second_imm8 = $signed(second_inst[7:0]);
 
    always @(*) begin
-      dest_reg_first = rd_first;
-      dest_reg_second = rd_second;
+      dest_first_reg = rd_first;
+      dest_second_reg = rd_second;
       execute_op_first_reg = NOP;
       execute_op_second_reg = NOP;
       arg_first_0_reg = 0;
       arg_first_1_reg = 0;
       arg_second_0_reg = 0;
       arg_second_1_reg = 0;
-      stall_reg = 0;
 
       case (opcode_first)
 	    // Add, f = 0
@@ -546,7 +532,7 @@ module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, re
 	       execute_op_second_reg = ADD;
 	       arg_second_0_reg = reg_value_second_0;
 	       arg_second_1_reg = reg_value_second_1;
-           if (dest_reg_first == reg_addr_second_1) begin
+           if (dest_first_reg == reg_addr_second_1) begin
               cant_consume_both_reg = 1;
               execute_op_second_reg = NOP;
            end
@@ -561,7 +547,7 @@ module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, re
 	       execute_op_second_reg = SUB;
 	       arg_second_0_reg = reg_value_second_0;
 	       arg_second_1_reg = reg_value_second_1;
-           if (dest_reg_first == reg_addr_second_1) begin
+           if (dest_first_reg == reg_addr_second_1) begin
               cant_consume_both_reg = 1;
               execute_op_second_reg = NOP;
            end
@@ -569,7 +555,7 @@ module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, re
 
       endcase // case (opcode_second)
 
-      if (dest_reg_first == reg_addr_second_0) begin
+      if (dest_first_reg == reg_addr_second_0) begin
          cant_consume_both_reg = 1;
          execute_op_second_reg = NOP;
       end
@@ -590,13 +576,14 @@ module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, re
    assign reg_addr_second_1 = second_inst[2:0];
    
    always @(posedge clk) begin
-      arg_first_0_out <= arg_first_0_reg;
-      arg_first_1_out <= arg_first_1_reg;
-      arg_second_0_out <= arg_second_0_reg;
-      arg_second_1_out <= arg_second_1_reg; 
-      execute_op_out <= execute_op_reg;
-      pc_out_out <= pc_out_reg;
-      dest_out <= dest_reg;
+      arg_first_0_wire_out <= arg_first_0_reg;
+      arg_first_1_wire_out <= arg_first_1_reg;
+      arg_second_0_wire_out <= arg_second_0_reg;
+      arg_second_1_wire_out <= arg_second_1_reg; 
+      execute_op_first_wire_out <= execute_op_first_reg;
+      dest_first_wire_out <= dest_first_reg;
+		execute_op_second_wire_out <= execute_op_second_reg;
+      dest_first_wire_out <= dest_second_reg;
    end
 
    assign arg_first_0 = arg_first_0_wire_out;
