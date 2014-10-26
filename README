@@ -1,36 +1,12 @@
-Due date: Sunday 10/5/2014 @11:59pm
+Due date: Wednesday 10/29/2014 @11:59pm
 
-Objective: build a simple pipeline with forwarding
+Assignment: A 3-stage (FDX) super-scalar implementation of the C16 architecture.
 
-Assignment: 
+We will make some simplifying assumptions:
 
-Use a simple pipeline to implement a subset of the C16 instruction set.
+- only support the "add" and "sub" instructions (f=0, f=1)
+- no branching
+- no memory instructions
 
-The 3-stages are: F (fetch), D (decode/operands), X (execute)
-
-We will make the following assumptions:
-
-    - no memory instructions
-    - all branch instructions will be followed by two nops
-    - need to implement forwarding
-
-- We need to single-step through programs, Let's use KEY0 as a clock.
-
-- You only need to implement and test the following instruction:
-
-    - add (f=0, f=1)
-    - slt (f=0; f=1)
-    - lea (f=0, f=1)
-    - call (f=0, f=1)
-    - shl (f=0, f=1)
-    - brz (f=0, f=1)
-
-- Please continue to develop and share unit tests
-
-- the hex display depends on the position of the SW[3:0]
-
-    - 0xxx   => show register xxx
-    - 1000   => show the instruction in the D-stage
-
-- LDER[9:0] display the 10 least significant bits of the PC in the D-stage
-
+Memory is still word (16-bit) addressable but is 32-bit wide. The design
+with the highest steady-state IPC wins.
