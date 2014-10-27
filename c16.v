@@ -67,13 +67,12 @@ module c16(
 
    wire [15:0]                  reg_0;
    wire [15:0]                  reg_1;
-   wire [15:0]                  reg_dbg;
    wire [15:0]                  reg_write_value;
 
    wire [2:0]                   reg_addr_0;
    wire [2:0]                   reg_addr_1;
-   wire [2:0]                   reg_write_dest;
-   wire                         reg_write_enable;
+   wire [2:0]                   reg_write_dest = 0;
+   wire                         reg_write_enable = 0;
 
    // For new register file
    wire [2:0]                   read_addr_first_0;
@@ -162,6 +161,9 @@ module c16(
    wire [15:0]                  arg_first_1;
    wire [15:0]                  arg_second_0;
    wire [15:0]                  arg_second_1;
+	
+	wire [15:0]	instruction_first_dbg;
+	wire [15:0]	instruction_second_dbg;
 
    decoder(.clk(clk),
            .instruction(instruction),
@@ -182,7 +184,9 @@ module c16(
            .arg_second_0(arg_second_0),
            .arg_second_1(arg_second_1),
            .dest_first(dest_first),
-           .dest_second(dest_second)
+           .dest_second(dest_second),
+			  .instruction_first_dbg(instruction_first_dbg),
+			  .instruction_second_dbg(instruction_second_dbg)
            );
 
    executor(
@@ -230,7 +234,8 @@ module c16(
    ///////////////////
    reg [15:0]                   debug;
 
-   //assign LEDR = next_x_pc[9:0];
+   assign LEDR = fetch_pc[9:0];
+	assign LEDG = {stall,write_enable_first,write_enable_second,5'h0};
 
    display(debug[15:12], HEX3);
    display(debug[11:8], HEX2);
@@ -240,9 +245,15 @@ module c16(
    // what do we display
    always @(*) begin
 		if (SW[3]) begin
-	     debug = instruction;
-      end else begin
-	     debug = reg_dbg;
+	     debug = instruction_first_dbg;
+      end else if (SW[4])begin
+	     debug = instruction_second_dbg;
+		end else if (SW[5]) begin
+			debug = {1'h0,read_addr_first_0,1'h0,read_addr_first_1,1'h0,read_addr_second_0,1'h0,read_addr_second_1};
+		end else if (SW[6])begin
+			debug = {1'h0,write_addr_first, 1'h0,write_addr_second, 8'h0};
+		end else begin
+	     debug = read_value_dbg;
       end
    end
 
@@ -381,11 +392,11 @@ module fetcher(clk, stall, next_pc, pc_out);
    reg [15:0]    next_fetch_pc;
 
    initial begin
-      fetch_pc = -1;
+      fetch_pc = 16'hffff;
    end
 
    always @(*) begin
-      if (stall) begin
+      if (stall && fetch_pc != 16'hffff) begin
 	     next_fetch_pc = fetch_pc;
       end else begin
 	     next_fetch_pc = fetch_pc + 1;
@@ -406,7 +417,7 @@ endmodule
 /////////////////////////
 module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, reg_value_second_0, reg_value_second_1, execute_op_first, execute_op_second, stall,
 	           reg_addr_first_0, reg_addr_first_1, reg_addr_second_0, reg_addr_second_1,
-	           arg_first_0, arg_first_1, arg_second_0, arg_second_1, dest_first, dest_second);
+	           arg_first_0, arg_first_1, arg_second_0, arg_second_1, dest_first, dest_second, instruction_first_dbg,instruction_second_dbg);
 
    // Execute stage's parameters
    parameter ADD = 4'h0;
@@ -426,6 +437,9 @@ module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, re
    output [15:0] arg_first_1;
    output [15:0] arg_second_0;
    output [15:0] arg_second_1;
+	
+	output [15:0] instruction_first_dbg;
+	output [15:0] instruction_second_dbg;
    
    output        stall;
 
@@ -457,7 +471,7 @@ module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, re
    reg [2:0]     dest_second_wire_out;
 
    // Communication between decode and queuey
-   reg           cant_consume_both_reg;
+   reg  [1:0]        num_items_consumed = 2;
 
    wire [15:0]   first_inst;
    wire [15:0]   second_inst;
@@ -465,7 +479,7 @@ module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, re
    queuey (.from_memory/*32i*/(instruction),
 	       .first_inst/*16o*/(first_inst),
 	       .second_inst/*16o*/(second_inst),
-	       .num_items_consumed/*1i*/(cant_consume_both_reg),
+	       .num_items_consumed/*1i*/(pc_in == 16'hffff ? 2 : num_items_conumed),
 	       .should_memory_stall/*1o*/(stall)
 	       );
 
@@ -517,8 +531,7 @@ module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, re
 
       endcase // case (opcode_first)
 
-      // 0 means we can consume 2 instructions
-      cant_consume_both_reg = 0;
+      num_items_consumed = 2;
       case (opcode_second)
         // Add, f = 0
 	    5'b00000: begin
@@ -533,7 +546,7 @@ module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, re
 	       arg_second_0_reg = reg_value_second_0;
 	       arg_second_1_reg = reg_value_second_1;
            if (dest_first_reg == reg_addr_second_1) begin
-              cant_consume_both_reg = 1;
+              num_items_consumed = 1;
               execute_op_second_reg = NOP;
            end
 	    end
@@ -548,7 +561,7 @@ module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, re
 	       arg_second_0_reg = reg_value_second_0;
 	       arg_second_1_reg = reg_value_second_1;
            if (dest_first_reg == reg_addr_second_1) begin
-              cant_consume_both_reg = 1;
+              num_items_consumed = 1;
               execute_op_second_reg = NOP;
            end
 	    end
@@ -556,7 +569,7 @@ module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, re
       endcase // case (opcode_second)
 
       if (dest_first_reg == reg_addr_second_0) begin
-         cant_consume_both_reg = 1;
+         num_items_consumed = 1;
          execute_op_second_reg = NOP;
       end
 
@@ -583,7 +596,7 @@ module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, re
       execute_op_first_wire_out <= execute_op_first_reg;
       dest_first_wire_out <= dest_first_reg;
 		execute_op_second_wire_out <= execute_op_second_reg;
-      dest_first_wire_out <= dest_second_reg;
+      dest_second_wire_out <= dest_second_reg;
    end
 
    assign arg_first_0 = arg_first_0_wire_out;
@@ -594,6 +607,8 @@ module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, re
    assign execute_op_second = execute_op_second_wire_out;
    assign dest_first = dest_first_wire_out;
    assign dest_second = dest_second_wire_out;
+	assign instruction_first_dbg = first_inst;
+	assign instruction_second_dbg = second_inst;
 
 endmodule
 
@@ -700,10 +715,19 @@ module queuey(clk,
          next_queue_1 = from_memory[15:0];
       end
    end // always @ begin
-   
+	
+	always @(*) begin
+		if (num_items_consumed != 2 ) begin
+			should_memory_stall_reg = 1;
+		end else begin
+			should_memory_stall_reg = 0;
+		end
+	end
+	
+   // ææææææææææøøøøøøøøøøøååååååååååååååå
    always @(posedge clk) begin
       queue_size <= queue_size;
-      if (num_items_consumed == 0) begin // 2 were consumed
+      if (num_items_consumed == 2) begin 
          if (queue_size == 1) begin
             queue[0] <= next_queue_1;
          end else if (queue_size == 2) begin
@@ -713,12 +737,10 @@ module queuey(clk,
          if (queue_size == 0) begin
             queue_size <= 1;
             queue[0] <= next_queue_0;
-            should_memory_stall_reg <= 1;
          end else if (queue_size == 1) begin
             queue_size <= 2;
             queue[0] <= next_queue_0;
             queue[1] <= next_queue_1;
-            should_memory_stall_reg = 1;
          end else if (queue_size == 2) begin
             queue[0] <= next_queue_0;
             queue[1] <= next_queue_1;
