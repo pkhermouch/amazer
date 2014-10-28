@@ -396,7 +396,7 @@ module fetcher(clk, stall, next_pc, pc_out);
    end
 
    always @(*) begin
-      if (stall && fetch_pc != 16'hffff) begin
+      if (stall) begin
 	     next_fetch_pc = fetch_pc;
       end else begin
 	     next_fetch_pc = fetch_pc + 1;
@@ -479,7 +479,7 @@ module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, re
    queuey (.from_memory/*32i*/(instruction),
 	       .first_inst/*16o*/(first_inst),
 	       .second_inst/*16o*/(second_inst),
-	       .num_items_consumed/*1i*/(pc_in == 16'hffff ? 2 : num_items_conumed),
+	       .num_items_consumed/*1i*/(num_items_consumed),
 	       .should_memory_stall/*1o*/(stall)
 	       );
 
@@ -503,6 +503,7 @@ module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, re
       arg_second_0_reg = 0;
       arg_second_1_reg = 0;
 
+		
       case (opcode_first)
 	    // Add, f = 0
 	    5'b00000: begin
@@ -572,6 +573,13 @@ module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, re
          num_items_consumed = 1;
          execute_op_second_reg = NOP;
       end
+		
+		if  (first_inst == 16'h0000 && second_inst == 16'h0000) begin
+			execute_op_first_reg = NOP;
+			execute_op_second_reg = NOP;
+			num_items_consumed = 2;
+		end
+		
 
       /*
        Logic for determining whether or not we can do two instructions or only one
@@ -675,7 +683,7 @@ module queuey(clk,
 
    input clk;
    input [31:0] from_memory;
-   input        num_items_consumed;
+   input [1:0]       num_items_consumed;
 
    output [15:0] first_inst;
    output [15:0] second_inst;
@@ -693,7 +701,7 @@ module queuey(clk,
 
    initial begin
       queue[0] = 16'h0;
-      queue[1] = 16'h1;
+      queue[1] = 16'h0;
       queue_size = 2'h0;
    end
 
@@ -717,7 +725,7 @@ module queuey(clk,
    end // always @ begin
 	
 	always @(*) begin
-		if (num_items_consumed != 2 ) begin
+		if (num_items_consumed != 2) begin
 			should_memory_stall_reg = 1;
 		end else begin
 			should_memory_stall_reg = 0;
