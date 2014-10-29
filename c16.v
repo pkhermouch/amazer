@@ -95,6 +95,8 @@ module c16(
    wire [15:0]                  read_value_second_1;
    wire [15:0]                  read_value_dbg;
    
+	wire [1:0] 							queue_size;
+	wire [1:0]						num_items_consumed;
 
    registers(.clk(clk),
              .read_addr_first_0(read_addr_first_0),
@@ -186,7 +188,9 @@ module c16(
            .dest_first(dest_first),
            .dest_second(dest_second),
 			  .instruction_first_dbg(instruction_first_dbg),
-			  .instruction_second_dbg(instruction_second_dbg)
+			  .instruction_second_dbg(instruction_second_dbg),
+			  .queue_size_out(queue_size),
+			  .num_items_consumed_out(num_items_consumed)
            );
 
    executor(
@@ -252,9 +256,11 @@ module c16(
 			debug = {1'h0,read_addr_first_0,1'h0,read_addr_first_1,1'h0,read_addr_second_0,1'h0,read_addr_second_1};
 		end else if (SW[6])begin
 			debug = {1'h0,write_addr_first, 1'h0,write_addr_second, 8'h0};
+		end else if (SW[9]) begin
+			debug = {2'h0,queue_size,2'h0,num_items_consumed,8'h0};
 		end else begin
 	     debug = read_value_dbg;
-      end
+      end 
    end
 
 
@@ -417,7 +423,7 @@ endmodule
 /////////////////////////
 module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, reg_value_second_0, reg_value_second_1, execute_op_first, execute_op_second, stall,
 	           reg_addr_first_0, reg_addr_first_1, reg_addr_second_0, reg_addr_second_1,
-	           arg_first_0, arg_first_1, arg_second_0, arg_second_1, dest_first, dest_second, instruction_first_dbg,instruction_second_dbg);
+	           arg_first_0, arg_first_1, arg_second_0, arg_second_1, dest_first, dest_second, instruction_first_dbg,instruction_second_dbg,queue_size_out,num_items_consumed_out);
 
    // Execute stage's parameters
    parameter ADD = 4'h0;
@@ -451,7 +457,10 @@ module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, re
    output [2:0]  reg_addr_first_1;
    output [2:0]  reg_addr_second_0;
    output [2:0]  reg_addr_second_1;
-
+	
+	output [1:0]   queue_size_out;
+	output [1:0]   num_items_consumed_out;
+ 
    reg [3:0]     execute_op_first_reg;
    reg [3:0]     execute_op_second_reg;
    reg [15:0]    arg_first_0_reg;
@@ -476,11 +485,14 @@ module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, re
    wire [15:0]   first_inst;
    wire [15:0]   second_inst;
 
-   queuey (.from_memory/*32i*/(instruction),
+   queuey (.clk(clk),
+			.from_memory/*32i*/(instruction),
 	       .first_inst/*16o*/(first_inst),
 	       .second_inst/*16o*/(second_inst),
 	       .num_items_consumed/*1i*/(num_items_consumed),
-	       .should_memory_stall/*1o*/(stall)
+	       .should_memory_stall/*1o*/(stall),
+			 .queue_size_out(queue_size_out),
+			 .num_items_consumed_out(num_items_consumed_out)
 	       );
 
    wire [4:0]    opcode_first = first_inst[15:11];
@@ -574,9 +586,13 @@ module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, re
          execute_op_second_reg = NOP;
       end
 		
-		if  (first_inst == 16'h0000 && second_inst == 16'h0000) begin
-			execute_op_first_reg = NOP;
-			execute_op_second_reg = NOP;
+		if  (first_inst == 16'h0000 || second_inst == 16'h0000) begin
+			if (first_inst == 16'h0) begin
+				execute_op_first_reg = NOP;
+			end
+			if (second_inst == 16'h0) begin
+				execute_op_second_reg = NOP;
+			end
 			num_items_consumed = 2;
 		end
 		
@@ -617,7 +633,6 @@ module decoder(clk, instruction, pc_in, reg_value_first_0, reg_value_first_1, re
    assign dest_second = dest_second_wire_out;
 	assign instruction_first_dbg = first_inst;
 	assign instruction_second_dbg = second_inst;
-
 endmodule
 
 
@@ -678,7 +693,9 @@ module queuey(clk,
 	          first_inst/*16o*/,
 	          second_inst/*16o*/,
 	          num_items_consumed/*2i*/,
-	          should_memory_stall/*1o*/
+	          should_memory_stall/*1o*/,
+				 queue_size_out,
+				 num_items_consumed_out
 	          );
 
    input clk;
@@ -688,9 +705,11 @@ module queuey(clk,
    output [15:0] first_inst;
    output [15:0] second_inst;
    output        should_memory_stall;
+	output [1:0]  queue_size_out;
+	output [1:0]  num_items_consumed_out;
 
    reg [15:0]    queue[1:0];
-   reg [1:0]     queue_size;
+   reg [1:0]     queue_size = 1;
 
    reg [15:0]    first_inst_reg;
    reg [15:0]    second_inst_reg;
@@ -706,26 +725,27 @@ module queuey(clk,
    end
 
    always @(*) begin
-      if (queue_size == 0) begin
+      if (queue_size == 2'h0) begin
          // first inst: 0-15, second: 16-31
          first_inst_reg = from_memory[15:0];
          second_inst_reg = from_memory[31:16];
          next_queue_0 = from_memory[31:16];
-      end else if (queue_size == 1) begin
+      end else if (queue_size == 2'h1) begin
          first_inst_reg = queue[0];
          second_inst_reg = from_memory[15:0];
          next_queue_0 = from_memory[15:0];
          next_queue_1 = from_memory[31:16];
-      end else begin
+      end else begin // size == 2
          first_inst_reg = queue[0];
          second_inst_reg = queue[1];
-         next_queue_0 = queue[1];
-         next_queue_1 = from_memory[15:0];
+			// These shouldn't ever be loaded
+         next_queue_0 = 16'hface;
+         next_queue_1 = 16'hbabe;
       end
    end // always @ begin
 	
 	always @(*) begin
-		if (num_items_consumed != 2) begin
+		if (num_items_consumed == 1 && queue_size == 1) begin
 			should_memory_stall_reg = 1;
 		end else begin
 			should_memory_stall_reg = 0;
@@ -734,24 +754,23 @@ module queuey(clk,
 	
    // ææææææææææøøøøøøøøøøøååååååååååååååå
    always @(posedge clk) begin
-      queue_size <= queue_size;
       if (num_items_consumed == 2) begin 
-         if (queue_size == 1) begin
+         if (queue_size == 2'h1) begin
+				queue_size <= 2'h1;
             queue[0] <= next_queue_1;
-         end else if (queue_size == 2) begin
-            queue_size <= 0;
-         end
+         end else begin
+				queue_size <= 2'h0;
+			end
       end else begin
-         if (queue_size == 0) begin
-            queue_size <= 1;
+         if (queue_size == 2'h0) begin
+            queue_size <= 2'h1;
             queue[0] <= next_queue_0;
-         end else if (queue_size == 1) begin
-            queue_size <= 2;
-            queue[0] <= next_queue_0;
-            queue[1] <= next_queue_1;
-         end else if (queue_size == 2) begin
+         end else if (queue_size == 2'h1) begin
+            queue_size <=2'h2;
             queue[0] <= next_queue_0;
             queue[1] <= next_queue_1;
+         end else if (queue_size == 2'h2) begin
+				queue_size <= 2'h1;
          end
       end // else: !if(num_items_consumed == 0)
    end
@@ -759,7 +778,8 @@ module queuey(clk,
    assign first_inst = first_inst_reg;
    assign second_inst = second_inst_reg;
    assign should_memory_stall = should_memory_stall_reg;
-
+	assign queue_size_out = queue_size;
+	assign num_items_consumed_out = num_items_consumed;
 endmodule // queuey
 
 
