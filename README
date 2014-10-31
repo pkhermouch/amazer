@@ -1,12 +1,2 @@
-Due date: Wednesday 10/29/2014 @11:59pm
 
-Assignment: A 3-stage (FDX) super-scalar implementation of the C16 architecture.
-
-We will make some simplifying assumptions:
-
-- only support the "add" and "sub" instructions (f=0, f=1)
-- no branching
-- no memory instructions
-
-Memory is still word (16-bit) addressable but is 32-bit wide. The design
-with the highest steady-state IPC wins.
+We're in between assignments, but we know that we're probably adding a branch predictor to this.
