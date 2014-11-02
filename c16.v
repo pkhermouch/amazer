@@ -69,7 +69,7 @@ registers(
 
 wire[15:0] instruction_addr;
 wire[15:0] instruction;
-
+wire[15:0] memignore;
 ram2 (
   .address_a(instruction_addr),
   .address_b(0),
@@ -79,7 +79,7 @@ ram2 (
   .wren_a(0),
   .wren_b(0),
   .q_a(instruction),
-  .q_b(0) // value out for load instructions NOPE
+  .q_b(memignore) // value out for load instructions NOPE
   );
 
 wire[15:0] branch_pc;
@@ -88,6 +88,7 @@ wire[15:0] fetch_pc;
 wire pc_write_enable;
 wire should_fetch_stall;
 wire should_decode_stall;
+wire[15:0] lpo;
 
 fetcher(
   .clk(clk),
@@ -98,6 +99,7 @@ fetcher(
   .should_decode_stall(should_decode_stall),
   .next_pc(instruction_addr),
   .pc_out(fetch_pc),
+  .last_pcs_out(lpo)
   );
 
 wire[2:0] next_x_dest;
@@ -145,6 +147,7 @@ executor(
 reg [15:0]debug;
 
 assign LEDR = next_x_pc[9:0];
+assign LEDG = {should_fetch_stall, should_decode_stall, reg_write_enable, pc_write_enable, 4'b0};
 
 display(debug[15:12], HEX3);
 display(debug[11:8], HEX2);
@@ -153,7 +156,11 @@ display(debug[3:0], HEX0);
 
 // what do we display
 always @(*) begin
-  if (SW[6]) begin
+  if (SW[9]) begin
+	 debug = next_x_pc;
+  end else if (SW[8]) begin
+    debug = lpo;
+  end else if (SW[6]) begin
     debug = reg_write_value;
   end else if (SW[3]) begin
     debug = instruction;
@@ -232,7 +239,7 @@ endmodule
 /////////////////////////
 // FETCH STAGE         //
 /////////////////////////
-module fetcher(clk, pc_write_enable, pc_in, execute_pc, should_i_stall, should_decode_stall, next_pc, pc_out);
+module fetcher(clk, pc_write_enable, pc_in, execute_pc, should_i_stall, should_decode_stall, next_pc, pc_out, last_pcs_out);
 
   input clk;
   input pc_write_enable;
@@ -245,6 +252,7 @@ module fetcher(clk, pc_write_enable, pc_in, execute_pc, should_i_stall, should_d
 
   output[15:0] next_pc;
   output[15:0] pc_out;
+  output[15:0] last_pcs_out;
 
   output should_decode_stall;
 
@@ -255,9 +263,15 @@ module fetcher(clk, pc_write_enable, pc_in, execute_pc, should_i_stall, should_d
   reg[15:0] branch_targets[63:0];
   reg[15:0] last_pcs[2:0];
   reg stall_reg;
+  reg [31:0] n_ticks;
 
   initial begin
+    
     fetch_pc = -1;
+	 last_pcs[2] = 1;
+	 last_pcs[1] = 1;
+	 last_pcs[0] = 1;
+	 n_ticks = 0;
   end
 
   wire[5:0] branching_index = execute_pc[5:0];
@@ -267,7 +281,7 @@ module fetcher(clk, pc_write_enable, pc_in, execute_pc, should_i_stall, should_d
   always @(*) begin
     stall_reg = 0;
     if  (pc_write_enable == 1) begin
-      if (last_pcs[2] != pc_in) begin
+      if (last_pcs[1] != pc_in) begin
         // There was a branch and we didn't guess it
         next_fetch_pc = pc_in;
         stall_reg = 1;
@@ -275,7 +289,7 @@ module fetcher(clk, pc_write_enable, pc_in, execute_pc, should_i_stall, should_d
     end else if (should_i_stall) begin
       next_fetch_pc = fetch_pc;
     end else begin
-      if (last_pcs[2] != execute_pc + 1) begin
+      if (last_pcs[1] != execute_pc + 1 && n_ticks < 2) begin
         // We guessed there was a branch and there wasn't
         next_fetch_pc = execute_pc + 1;
         stall_reg = 1;
@@ -298,11 +312,13 @@ module fetcher(clk, pc_write_enable, pc_in, execute_pc, should_i_stall, should_d
     last_pcs[0] <= next_fetch_pc;
     last_pcs[1] <= last_pcs[0];
     last_pcs[2] <= last_pcs[1];
+	 n_ticks <= n_ticks + 1;
   end
 
   assign should_decode_stall = stall_reg;
   assign next_pc = next_fetch_pc;
   assign pc_out = fetch_pc;
+  assign last_pcs_out = last_pcs[1];
 endmodule
 
 /////////////////////////
@@ -313,7 +329,7 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, should_i_stall
 
   // Execute stage's parameters
   parameter SUB = 4'hf;
-  parameter ADD = 4'h0
+  parameter ADD = 4'h0;
   parameter NOP = 4'h2;
   parameter BRZ = 4'h5;
 
@@ -360,6 +376,10 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, should_i_stall
 
   wire [15:0]imm5 = $signed(instruction[4:0]);
   wire [15:0]imm8 = $signed(instruction[7:0]);
+  
+  initial begin
+    pc_out_out = 0;
+	end 
 
   always @(*) begin
     pc_out_reg = pc_in;
@@ -413,6 +433,7 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, should_i_stall
         arg_1_reg = imm8;
         reg_addr_1_reg = rd;
       end
+	endcase
   end
 
   assign reg_addr_0 = instruction[7:5];
@@ -431,13 +452,11 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, should_i_stall
     end
     pc_out_out <= pc_out_reg;
     dest_out <= dest_reg;
-    decode_op <= next_decode_op;
     if (should_i_stall) begin
       execute_op_out <= NOP;
       cycles_to_stall <= 1;
     end else if (cycles_to_stall > 0) begin
       execute_op_out <= NOP;
-      decode_op_rd <= NOP;
       cycles_to_stall <= cycles_to_stall - 1;
     end
   end
