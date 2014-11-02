@@ -1,2 +1,11 @@
+Due date: Friday 11/7/2014 @11:59pm
 
-We're in between assignments, but we know that we're probably adding a branch predictor to this.
+Assignment:  Add a 2-bit saturating counter branch target predictor to your
+C16 implementation.
+
+Limitations:
+
+   - no memory instructions
+   - no super-scalar
+   - only need to implement add, sub, and branch
+

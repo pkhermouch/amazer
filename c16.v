@@ -314,7 +314,8 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, stall, reg_add
 	arg_0, arg_1, pc_out, dest, memory_write_enable, memory_value_dest, memory_value_enable);
 
 	// Execute stage's parameters
-	parameter ADD = 4'h0;
+	parameter SUB = 4'hf;
+	parameter ADD = 4'h0
 	parameter SET = 4'h1;
 	parameter NOP = 4'h2;
 	parameter SHFT = 4'h3;
@@ -409,6 +410,20 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, stall, reg_add
 			// Add, f = 1
 			5'b00001: begin
 				execute_op_reg = ADD;
+				arg_0_reg = reg_0;
+				arg_1_reg = reg_1;
+			end
+
+			// Sub, f = 0
+			5'b00010: begin
+				execute_op_reg = SUB;
+				arg_0_reg = reg_0;
+				arg_1_reg = imm5;
+			end
+
+			// Sub, f = 1
+			5'b00011: begin
+				execute_op_reg = SUB;
 				arg_0_reg = reg_0;
 				arg_1_reg = reg_1;
 			end
@@ -619,6 +634,7 @@ endmodule
 /////////////////////////
 module executor(clk, execute_op, arg_0, arg_1, dest_in, pc_in, dest_out, reg_value_out, reg_write_enable, pc_value_out, pc_write_enable);
 
+	parameter SUB = 4'hf;
 	parameter ADD = 4'h0;
 	parameter SET = 4'h1;
 	parameter NOP = 4'h2;
@@ -660,6 +676,10 @@ module executor(clk, execute_op, arg_0, arg_1, dest_in, pc_in, dest_out, reg_val
 			end
 			ADD: begin
 				reg_value_out_reg = arg_0 + arg_1;
+				reg_write_enable_reg = 1;
+			end
+			SUB: begin
+				reg_value_out_reg = arg_0 - arg_1;
 				reg_write_enable_reg = 1;
 			end
 			SET: begin
