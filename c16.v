@@ -281,7 +281,7 @@ module fetcher(clk, pc_write_enable, pc_in, execute_pc, should_i_stall, should_d
   always @(*) begin
     stall_reg = 0;
     if  (pc_write_enable == 1) begin
-      if (last_pcs[1] != pc_in) begin
+      if (last_pcs[2] != pc_in) begin
         // There was a branch and we didn't guess it
         next_fetch_pc = pc_in;
         stall_reg = 1;
@@ -289,7 +289,7 @@ module fetcher(clk, pc_write_enable, pc_in, execute_pc, should_i_stall, should_d
     end else if (should_i_stall) begin
       next_fetch_pc = fetch_pc;
     end else begin
-      if (last_pcs[1] != execute_pc + 1 && n_ticks < 2) begin
+      if (last_pcs[2] != execute_pc + 1 && n_ticks > 2) begin
         // We guessed there was a branch and there wasn't
         next_fetch_pc = execute_pc + 1;
         stall_reg = 1;
