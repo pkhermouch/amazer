@@ -285,6 +285,11 @@ module fetcher(clk, pc_write_enable, pc_in, execute_pc, should_i_stall, should_d
         // There was a branch and we didn't guess it
         next_fetch_pc = pc_in;
         stall_reg = 1;
+      // Use the branch prediction FSM to guess the next PC!
+      end else if (branch_counters[current_index] >= 2'b10) begin
+        next_fetch_pc = branch_targets[current_index];
+      end else begin
+        next_fetch_pc = fetch_pc + 1;
       end
     end else if (should_i_stall) begin
       next_fetch_pc = fetch_pc;
