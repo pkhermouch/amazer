@@ -267,7 +267,7 @@ module fetcher(clk, pc_write_enable, pc_in, execute_pc, should_i_stall, should_d
   // Should we pay attention to last_pcs?
   reg[1:0] n_ticks_to_not_predict;
   // Set this wire when we recognize that we failed at predicting
-  wire failure;
+  reg failure;
 
   initial begin
     
