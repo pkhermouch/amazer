@@ -85,21 +85,21 @@ ram2 (
 wire[15:0] branch_pc;
 wire[15:0] fetch_pc;
 
-wire pc_write_enable;
 wire should_fetch_stall;
 wire should_decode_stall;
+wire detector_failed;
 wire[15:0] lpo;
 
 fetcher(
   .clk(clk),
-  .pc_write_enable(pc_write_enable),
   .pc_in(branch_pc),
   .execute_pc(next_x_pc),
   .should_i_stall(should_fetch_stall),
   .should_decode_stall(should_decode_stall),
   .next_pc(instruction_addr),
   .pc_out(fetch_pc),
-  .last_pcs_out(lpo)
+  .last_pcs_out(lpo),
+  .failure_out(detector_failed)
   );
 
 wire[2:0] next_x_dest;
@@ -138,7 +138,6 @@ executor(
   .reg_value_out(reg_write_value),
   .reg_write_enable(reg_write_enable),
   .pc_value_out(branch_pc),
-  .pc_write_enable(pc_write_enable)
   );
 
 ///////////////////
@@ -146,8 +145,8 @@ executor(
 ///////////////////
 reg [15:0]debug;
 
-assign LEDR = next_x_pc[9:0];
-assign LEDG = {should_fetch_stall, should_decode_stall, reg_write_enable, pc_write_enable, 4'b0};
+assign LEDR = fetch_pc[9:0];
+assign LEDG = {should_fetch_stall, should_decode_stall, reg_write_enable, detector_failed, 4'b0};
 
 display(debug[15:12], HEX3);
 display(debug[11:8], HEX2);
@@ -160,6 +159,8 @@ always @(*) begin
 	 debug = next_x_pc;
   end else if (SW[8]) begin
     debug = lpo;
+  end else if (SW[7]) begin
+    debug = branch_pc;
   end else if (SW[6]) begin
     debug = reg_write_value;
   end else if (SW[3]) begin
@@ -239,10 +240,9 @@ endmodule
 /////////////////////////
 // FETCH STAGE         //
 /////////////////////////
-module fetcher(clk, pc_write_enable, pc_in, execute_pc, should_i_stall, should_decode_stall, next_pc, pc_out, last_pcs_out);
+module fetcher(clk, pc_in, execute_pc, should_i_stall, should_decode_stall, next_pc, pc_out, last_pcs_out, failure_out);
 
   input clk;
-  input pc_write_enable;
   input should_i_stall;
 
   input[15:0] pc_in;
@@ -255,6 +255,7 @@ module fetcher(clk, pc_write_enable, pc_in, execute_pc, should_i_stall, should_d
   output[15:0] last_pcs_out;
 
   output should_decode_stall;
+  output failure_out;
 
   reg[15:0] fetch_pc;
   reg[15:0] next_fetch_pc;
@@ -272,9 +273,9 @@ module fetcher(clk, pc_write_enable, pc_in, execute_pc, should_i_stall, should_d
   initial begin
     
     fetch_pc = -1;
-	 last_pcs[2] = 1;
-	 last_pcs[1] = 1;
-	 last_pcs[0] = 1;
+	 last_pcs[2] = 0;
+	 last_pcs[1] = -1;
+	 last_pcs[0] = -1;
 	 n_ticks = 0;
      n_ticks_to_not_predict = 2;
   end
@@ -284,38 +285,23 @@ module fetcher(clk, pc_write_enable, pc_in, execute_pc, should_i_stall, should_d
 
   // Add branch prediction here
   always @(*) begin
-    stall_reg = 0;
-    failure = 0;
-    if  (pc_write_enable == 1) begin
-      if (last_pcs[2] != pc_in && n_ticks_to_not_predict == 0) begin
-        // There was a branch and we didn't guess it
-        next_fetch_pc = pc_in;
-        stall_reg = 1;
-        failure = 1;
-      // Use the branch prediction FSM to guess the next PC!
-      end else if (branch_counters[current_index] >= 2'b10) begin
-        next_fetch_pc = branch_targets[current_index];
-      end else begin
-        next_fetch_pc = fetch_pc + 1;
-      end
-    end else if (should_i_stall) begin
-      next_fetch_pc = fetch_pc;
-    end else begin
-      if (last_pcs[2] != execute_pc + 1 && n_ticks_to_not_predict == 0) begin
-        // We guessed there was a branch and there wasn't
-        next_fetch_pc = execute_pc + 1;
-        stall_reg = 1;
-        failure = 1;
-      end else if (branch_counters[current_index] >= 2'b10) begin
-        next_fetch_pc = branch_targets[current_index];
-      end else begin
-        next_fetch_pc = fetch_pc + 1;
-      end
-    end
-  end
+		 stall_reg = 0;
+		 failure = 0;
+		if (last_pcs[1] != pc_in && n_ticks_to_not_predict == 0) begin
+		  // There was a branch and we didn't guess it
+		  next_fetch_pc = pc_in;
+		  stall_reg = 1;
+		  failure = 1;
+		// Use the branch prediction FSM to guess the next PC!
+		end else if (branch_counters[current_index] >= 2'b10) begin
+		  next_fetch_pc = branch_targets[current_index];
+		end else begin
+		  next_fetch_pc = fetch_pc + 1;
+		end
+	end
 
-  always @(posedge clk) begin
-    if(pc_write_enable == 1) begin
+	  always @(posedge clk) begin
+    if(execute_pc + 1 != pc_in) begin
       branch_counters[branching_index] = branch_counters[branching_index] != 2'b11 ? branch_counters[branching_index] + 1 : 2'b11;
       branch_targets[branching_index] = pc_in;
     end else begin
@@ -335,8 +321,9 @@ module fetcher(clk, pc_write_enable, pc_in, execute_pc, should_i_stall, should_d
 
   assign should_decode_stall = stall_reg;
   assign next_pc = next_fetch_pc;
-  assign pc_out = fetch_pc;
+  assign pc_out = last_pcs[1];
   assign last_pcs_out = last_pcs[1];
+  assign failure_out = failure;
 endmodule
 
 /////////////////////////
@@ -447,7 +434,7 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, should_i_stall
       // brz, f = 1
       5'b11111: begin
         execute_op_reg = BRZ;
-        arg_0_reg = pc_in;
+        arg_0_reg = pc_in + 1;
         arg_1_reg = imm8;
         reg_addr_1_reg = rd;
       end
@@ -490,7 +477,7 @@ endmodule
 /////////////////////////
 // EXECUTE STAGE       //
 /////////////////////////
-module executor(clk, execute_op, arg_0, arg_1, dest_in, pc_in, dest_out, reg_value_out, reg_write_enable, pc_value_out, pc_write_enable);
+module executor(clk, execute_op, arg_0, arg_1, dest_in, pc_in, dest_out, reg_value_out, reg_write_enable, pc_value_out);
 
   parameter SUB = 4'hf;
   parameter ADD = 4'h0;
@@ -510,7 +497,6 @@ module executor(clk, execute_op, arg_0, arg_1, dest_in, pc_in, dest_out, reg_val
   reg[15:0] reg_value_out_reg;
   reg[15:0] pc_value_out_reg;
   reg reg_write_enable_reg;
-  reg pc_write_enable_reg;
 
   output[2:0] dest_out;
 
@@ -518,14 +504,12 @@ module executor(clk, execute_op, arg_0, arg_1, dest_in, pc_in, dest_out, reg_val
   output[15:0] pc_value_out;
 
   output reg_write_enable;
-  output pc_write_enable;
 
   always @(*) begin
     dest_out_reg = dest_in; //y
     reg_value_out_reg = 0;
-    pc_value_out_reg = 0;
+    pc_value_out_reg = pc_in + 1;
     reg_write_enable_reg = 0;
-    pc_write_enable_reg = 0;
     case (execute_op)
       NOP: begin
       end
@@ -539,7 +523,6 @@ module executor(clk, execute_op, arg_0, arg_1, dest_in, pc_in, dest_out, reg_val
       end
       BRZ: begin
         pc_value_out_reg = arg_0 + arg_1;
-        pc_write_enable_reg = 1;
       end
     endcase
   end
@@ -548,7 +531,6 @@ module executor(clk, execute_op, arg_0, arg_1, dest_in, pc_in, dest_out, reg_val
   assign reg_value_out = reg_value_out_reg;
   assign pc_value_out = pc_value_out_reg;
   assign reg_write_enable = reg_write_enable_reg;
-  assign pc_write_enable = pc_write_enable_reg;
 endmodule
 
 /////////////////////////
