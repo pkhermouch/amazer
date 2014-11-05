@@ -263,7 +263,11 @@ module fetcher(clk, pc_write_enable, pc_in, execute_pc, should_i_stall, should_d
   reg[15:0] branch_targets[63:0];
   reg[15:0] last_pcs[2:0];
   reg stall_reg;
-  reg [31:0] n_ticks;
+  reg[31:0] n_ticks;
+  // Should we pay attention to last_pcs?
+  reg[1:0] n_ticks_to_not_predict;
+  // Set this wire when we recognize that we failed at predicting
+  wire failure;
 
   initial begin
     
@@ -272,6 +276,7 @@ module fetcher(clk, pc_write_enable, pc_in, execute_pc, should_i_stall, should_d
 	 last_pcs[1] = 1;
 	 last_pcs[0] = 1;
 	 n_ticks = 0;
+     n_ticks_to_not_predict = 2;
   end
 
   wire[5:0] branching_index = execute_pc[5:0];
@@ -280,11 +285,13 @@ module fetcher(clk, pc_write_enable, pc_in, execute_pc, should_i_stall, should_d
   // Add branch prediction here
   always @(*) begin
     stall_reg = 0;
+    failure = 0;
     if  (pc_write_enable == 1) begin
-      if (last_pcs[2] != pc_in) begin
+      if (last_pcs[2] != pc_in && n_ticks_to_not_predict == 0) begin
         // There was a branch and we didn't guess it
         next_fetch_pc = pc_in;
         stall_reg = 1;
+        failure = 1;
       // Use the branch prediction FSM to guess the next PC!
       end else if (branch_counters[current_index] >= 2'b10) begin
         next_fetch_pc = branch_targets[current_index];
@@ -294,10 +301,11 @@ module fetcher(clk, pc_write_enable, pc_in, execute_pc, should_i_stall, should_d
     end else if (should_i_stall) begin
       next_fetch_pc = fetch_pc;
     end else begin
-      if (last_pcs[2] != execute_pc + 1 && n_ticks > 2) begin
+      if (last_pcs[2] != execute_pc + 1 && n_ticks_to_not_predict == 0) begin
         // We guessed there was a branch and there wasn't
         next_fetch_pc = execute_pc + 1;
         stall_reg = 1;
+        failure = 1;
       end else if (branch_counters[current_index] >= 2'b10) begin
         next_fetch_pc = branch_targets[current_index];
       end else begin
@@ -317,7 +325,12 @@ module fetcher(clk, pc_write_enable, pc_in, execute_pc, should_i_stall, should_d
     last_pcs[0] <= next_fetch_pc;
     last_pcs[1] <= last_pcs[0];
     last_pcs[2] <= last_pcs[1];
-	 n_ticks <= n_ticks + 1;
+    n_ticks <= n_ticks + 1;
+    if (n_ticks_to_not_predict > 0) begin
+      n_ticks_to_not_predict <= n_ticks_to_not_predict - 1;
+    end else if (failure) begin
+      n_ticks_to_not_predict <= 2;
+    end // implicit latch if neither of these cases occur
   end
 
   assign should_decode_stall = stall_reg;
