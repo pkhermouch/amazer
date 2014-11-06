@@ -85,7 +85,6 @@ ram2 (
 wire[15:0] branch_pc;
 wire[15:0] fetch_pc;
 
-wire should_fetch_stall;
 wire should_decode_stall;
 wire detector_failed;
 wire[15:0] lpo;
@@ -94,7 +93,6 @@ fetcher(
   .clk(clk),
   .pc_in(branch_pc),
   .execute_pc(next_x_pc),
-  .should_i_stall(should_fetch_stall),
   .should_decode_stall(should_decode_stall),
   .next_pc(instruction_addr),
   .pc_out(fetch_pc),
@@ -117,7 +115,6 @@ decoder(
   .reg_1(reg_1),
   .execute_op(next_x_op),
   .should_i_stall(should_decode_stall),
-  .should_fetch_stall(should_fetch_stall),
   .reg_addr_0(reg_addr_0),
   .reg_addr_1(reg_addr_1),
   .arg_0(arg_0),
@@ -146,7 +143,7 @@ executor(
 reg [15:0]debug;
 
 assign LEDR = fetch_pc[9:0];
-assign LEDG = {should_fetch_stall, should_decode_stall, reg_write_enable, detector_failed, 4'b0};
+assign LEDG = {should_decode_stall, reg_write_enable, detector_failed, 5'b0};
 
 display(debug[15:12], HEX3);
 display(debug[11:8], HEX2);
@@ -240,10 +237,9 @@ endmodule
 /////////////////////////
 // FETCH STAGE         //
 /////////////////////////
-module fetcher(clk, pc_in, execute_pc, should_i_stall, should_decode_stall, next_pc, pc_out, last_pcs_out, failure_out);
+module fetcher(clk, pc_in, execute_pc, should_decode_stall, next_pc, pc_out, last_pcs_out, failure_out);
 
   input clk;
-  input should_i_stall;
 
   input[15:0] pc_in;
   // When pc_write_enable is on, this is the pc of the branch
@@ -264,7 +260,6 @@ module fetcher(clk, pc_in, execute_pc, should_i_stall, should_decode_stall, next
   reg[15:0] branch_targets[63:0];
   reg[15:0] last_pcs[2:0];
   reg stall_reg;
-  reg[31:0] n_ticks;
   // Should we pay attention to last_pcs?
   reg[1:0] n_ticks_to_not_predict;
   // Set this wire when we recognize that we failed at predicting
@@ -273,11 +268,9 @@ module fetcher(clk, pc_in, execute_pc, should_i_stall, should_decode_stall, next
   initial begin
     
     fetch_pc = -1;
-	 last_pcs[2] = 0;
 	 last_pcs[1] = -1;
 	 last_pcs[0] = -1;
-	 n_ticks = 0;
-     n_ticks_to_not_predict = 2;
+    n_ticks_to_not_predict = 2;
   end
 
   wire[5:0] branching_index = execute_pc[5:0];
@@ -310,8 +303,6 @@ module fetcher(clk, pc_in, execute_pc, should_i_stall, should_decode_stall, next
     fetch_pc <= next_fetch_pc;
     last_pcs[0] <= next_fetch_pc;
     last_pcs[1] <= last_pcs[0];
-    last_pcs[2] <= last_pcs[1];
-    n_ticks <= n_ticks + 1;
     if (n_ticks_to_not_predict > 0) begin
       n_ticks_to_not_predict <= n_ticks_to_not_predict - 1;
     end else if (failure) begin
@@ -329,7 +320,7 @@ endmodule
 /////////////////////////
 // DECODE STAGE        //
 /////////////////////////
-module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, should_i_stall, should_fetch_stall, reg_addr_0, reg_addr_1,
+module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, should_i_stall, reg_addr_0, reg_addr_1,
   arg_0, arg_1, pc_out, dest);
 
   // Execute stage's parameters
@@ -350,8 +341,6 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, should_i_stall
   output[15:0] arg_0;
   output[15:0] arg_1;
   output[15:0] pc_out;
-
-  output should_fetch_stall;
 
   output[2:0] dest;
   output[3:0] execute_op;
@@ -375,8 +364,6 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, should_i_stall
   // Used to implement branching and count how many cycles we need to do nothing
   reg[1:0] cycles_to_stall;
 
-  reg stall_reg;
-
   wire [4:0] opcode = instruction[15:11];
   wire [2:0] rd = instruction[10:8];
 
@@ -394,7 +381,6 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, should_i_stall
     arg_0_reg = 0;
     arg_1_reg = 0;
     reg_addr_1_reg = instruction[2:0];
-    stall_reg = 0;
     case (opcode)
       // Add, f = 0
       5'b00000: begin
@@ -461,7 +447,6 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, should_i_stall
 
   assign reg_addr_0 = instruction[7:5];
   assign reg_addr_1 = reg_addr_1_reg;
-  assign should_fetch_stall = stall_reg;//& (cycles_to_stall == 0);
 
   always @(posedge clk) begin
     arg_0_out <= arg_0_reg;
