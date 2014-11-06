@@ -1,0 +1,8 @@
+add r0 r0 4
+sub r0 r0 1
+brz r0 2
+brz r1 -2
+add r1 r7 15
+brz r7 -4
+add r2 r2 2
+add r3 r3 3
