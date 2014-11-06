@@ -337,6 +337,7 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, should_i_stall
   parameter ADD = 4'h0;
   parameter NOP = 4'h2;
   parameter BRZ = 4'h5;
+  parameter BRNZ = 4'h6;
 
   input clk;
   input should_i_stall;
@@ -438,6 +439,23 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, should_i_stall
         arg_1_reg = imm8;
         reg_addr_1_reg = rd;
       end
+      
+      // brnz, f = 0
+      5'b11100: begin
+        execute_op_reg = BRNZ;
+        arg_0_reg = reg_0;
+        arg_1_reg = imm5;
+        reg_addr_1_reg = rd;
+      end
+
+      // brnz, f = 1
+      5'b11101: begin
+        execute_op_reg = BRNZ;
+        arg_0_reg = pc_in + 1;
+        arg_1_reg = imm8;
+        reg_addr_1_reg = rd;
+      end
+      
 	endcase
   end
 
@@ -454,6 +472,10 @@ module decoder(clk, instruction, pc_in, reg_0, reg_1, execute_op, should_i_stall
       if (reg_1 != 0) begin
         execute_op_out <= NOP;
       end
+    end else if (execute_op_reg == BRNZ) begin
+    	if (reg_1 == 0) begin
+    	  execute_op_out <= NOP;
+    	end
     end
     pc_out_out <= pc_out_reg;
     dest_out <= dest_reg;
@@ -483,6 +505,7 @@ module executor(clk, execute_op, arg_0, arg_1, dest_in, pc_in, dest_out, reg_val
   parameter ADD = 4'h0;
   parameter NOP = 4'h2;
   parameter BRZ = 4'h5;
+  parameter BRNZ = 5'h6;
 
   input clk;
 
@@ -522,6 +545,9 @@ module executor(clk, execute_op, arg_0, arg_1, dest_in, pc_in, dest_out, reg_val
         reg_write_enable_reg = 1;
       end
       BRZ: begin
+        pc_value_out_reg = arg_0 + arg_1;
+      end
+      BRNZ: begin
         pc_value_out_reg = arg_0 + arg_1;
       end
     endcase
