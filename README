@@ -1,11 +1,28 @@
-Due date: Friday 11/7/2014 @11:59pm
+Due date: Friday 11/14/2014 @11:59pm
 
-Assignment:  Add a 2-bit saturating counter branch target predictor to your
-C16 implementation.
+Assignment:  Implement a a scoreboard in the style of the the CDC6600
+for a subset of our C16 instructions
 
-Limitations:
+Stages:
 
-   - no memory instructions
-   - no super-scalar
-   - only need to implement add, sub, and branch
+    - Fetch
+    - D1 : decode, issue, WAW stalls, structural hazards
+    - D2 : read operands, RAW hazards
+    - X (depends on the functional unit)
+    - WB, WAR hazards
 
+Instruction subset:
+
+    - Integer add / subtract
+    - memory load / store
+    - no branches
+
+Functional units:
+
+    - be creative
+    - simplify your memory design and take as many cycles as you need to compute the effective
+      address and load from memory
+
+The CDC 6600 scoreboard is described starting at page 125 in Thornton's excellent book
+
+http://bitsavers.trailing-edge.com/pdf/cdc/cyber/books/DesignOfAComputer_CDC6600.pdf
