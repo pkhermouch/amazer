@@ -43,28 +43,67 @@ wire clk = KEY[0];        // single step using key0
 
 wire[15:0] reg_0;
 wire[15:0] reg_1;
+wire[15:0] reg_2;
+wire[15:0] reg_3;
+wire[15:0] reg_4;
 wire[15:0] reg_dbg;
-wire[15:0] reg_write_value;
 
 wire[2:0] reg_addr_0;
 wire[2:0] reg_addr_1;
-wire[2:0] reg_write_dest;
+wire[2:0] reg_addr_2;
+wire[2:0] reg_addr_3;
+wire[2:0] reg_addr_4;
 
-wire reg_write_enable;
+wire [15:0] mather_0_pc_in;
+wire [15:0] mather_0_operand_0;
+wire [15:0] mather_0_operand_1;
+wire [2:0] mather_0_operation;
+wire [2:0] mather_0_dest_in; // E 
+wire [2:0] mather_0_dest_out;
+wire [15:0] mather_0_result;
+wire [15:0] mather_0_pc_out;
+
+wire [15:0] mather_1_pc_in;
+wire [15:0] mather_1_operand_0;
+wire [15:0] mather_1_operand_1;
+wire [2:0] mather_1_operation;
+wire [2:0] mather_1_dest_in; // E 
+wire [2:0] mather_1_dest_out;
+wire [15:0] mather_1_result;
+wire [15:0] mather_1_pc_out;
+
+wire [15:0] memoreer_pc_in;
+wire [15:0] memoreer_operand_0;
+wire [15:0] memoreer_operand_1;
+wire [2:0] memoreer_operation;
+wire [2:0] memoreer_dest_in; // E 
+wire [2:0] memoreer_dest_out;
+wire [15:0] memoreer_result;
+wire [15:0] memoreer_pc_out;
 
 registers(
 	.clk(clk),
 	.read_addr_0(reg_addr_0),
 	.read_addr_1(reg_addr_1),
+	.read_addr_2(reg_addr_2),
+	.read_addr_3(reg_addr_3),
+	.read_addr_4(reg_addr_4),
 	.read_addr_dbg(SW[2:0]),
-	.write_addr(reg_write_dest),
-	.write_value(reg_write_value),
-	.write_enable(reg_write_enable),
+	.write_addr_0(mather_0_dest_out),
+	.write_value_0(mather_0_result),
+	.write_addr_1(mather_1_dest_out),
+	.write_value_1(mather_1_result),
+	.write_addr_2(memoreer_dest_out),
+	.write_value_2(memoreer_result),
 	.read_value_0(reg_0),
 	.read_value_1(reg_1),
+	.read_value_2(reg_2),
+	.read_value_3(reg_3),
+	.read_value_4(reg_4),
 	.read_value_dbg(reg_dbg)
 	);
 
+wire[15:0] instruction_addr;
 wire[15:0] instruction;
 wire[15:0] branch_pc;
 wire[15:0] fetch_pc;
@@ -78,16 +117,24 @@ fetcher(
 	.pc_out(fetch_pc),
 	.instruction(instruction)
 	);
+wire [15:0] memoreer_addr;
+wire memory_wren;
+wire [15:0] memory_value_in;
+wire [15:0] memory_value_out;
 
-wire[2:0] next_x_dest;
-wire[3:0] next_x_op;
+ram2 (
+	.address_a(instruction_addr),
+	.address_b(memoreer_addr),
+	.clock(clk),
+	.data_a(0),
+	.data_b(memory_value_in),
+	.wren_a(0),
+	.wren_b(memory_wren),
+	.q_a(instruction),
+	.q_b(memory_value_out) // value out for load instructions NOPE
+ 	);
 
-wire[15:0] next_x_pc;
-wire[15:0] arg_0;
-wire[15:0] arg_1;
-
-
-decoder(
+decoder_uno(
 	.clk(clk),
 	.instruction(instruction),
 	.pc_in(fetch_pc),
@@ -102,8 +149,17 @@ decoder(
 	.dest(next_x_dest)
 	);
 
+scorebored(
+	.clk(clk),
+	.pc_in(scorebored_pc_in),
+	.opcode(scorebored_opcode_in),
+	.destination_reg(scorebored_dest),
+	.source_0(scorebored_source_0),
+	.source_1(scorebored_source_1),
+	.should_fetch_stall(stall)
+	);
 
-executor(
+decoder_deux(
 	.clk(clk),
 	.execute_op(next_x_op),
 	.arg_0(arg_0),
@@ -117,6 +173,45 @@ executor(
 	.pc_write_enable(pc_write_enable)
 	);
 
+mather(
+	.clk(clk),
+	.pc_in(mather_0_pc_in),
+	.operand_0(mather_0_operand_0),
+	.operand_1(mather_0_operand_1),
+	.operation(mather_0_operation),
+	.destination_in(mather_0_dest_in), // E 
+	.destination_out(mather_0_dest_out),
+	.result(mather_0_result),
+	.pc_out(mather_0_pc_out)
+	);
+
+mather(
+	.clk(clk),
+	.pc_in(mather_1_pc_in),
+	.operand_0(mather_1_operand_0),
+	.operand_1(mather_1_operand_1),
+	.operation(mather_1_operation),
+	.destination_in(mather_1_dest_in), // E 
+	.destination_out(mather_1_dest_out),
+	.result(mather_1_result),
+	.pc_out(mather_1_pc_out)
+	);
+
+memoreer(
+	.clk(clk),
+	.pc_in(memoreer_pc_in),
+	.operand_0(memoreer_operand_0),
+	.operand_1(memoreer_operand_1),
+	.operation(memoreer_operation),
+	.destination_in(memoreer_dest_in), // E 
+	.destination_out(memoreer_dest_out),
+	.mem_addr_out(memoreer_addr),
+	.mem_wren(memory_wren),
+	.mem_value_out(memory_value_in),
+	.mem_value_in(memory_value_out),
+	.result(memoreer_result),
+	.pc_out(memoreer_pc_out)
+	);
 
 ///////////////////
 // debug support //
@@ -242,8 +337,6 @@ module fetcher(clk, pc_write_enable, pc_in, pc_out, instruction);
 		fetch_pc <= next_fetch_pc;
 	end
 
-	ram (next_fetch_pc, clk, 0, 0, mem_out);
-
 	assign instruction = mem_out;
 	assign pc_out = fetch_pc;
 
@@ -367,7 +460,7 @@ The detailed algorithm for the scoreboard control is described below:
 
 
 
-module scorebored(clk, pc_in, opcode, destination_reg,source_0,source_1, should_fetch_stall);
+module scorebored(clk, pc_in, opcode, destination_reg, source_0, source_1, should_fetch_stall);
 
 	parameter MATHER_0 = 3'h0;
 	parameter MATHER_1 = 3'h1;
@@ -401,7 +494,7 @@ module scorebored(clk, pc_in, opcode, destination_reg,source_0,source_1, should_
 	
 	output should_fetch_stall;
 	
-   reg should_fetch_stall_reg;
+	reg should_fetch_stall_reg;
 
 	reg [2:0] Instruction_Status [2:0]; // goes with IN_???_STATE
 	reg [2:0] Register_Status [7:0];  //   what functional unit will produce the value for each register
@@ -417,8 +510,8 @@ module scorebored(clk, pc_in, opcode, destination_reg,source_0,source_1, should_
 	reg [2:0] Source_Register_1_Ready [2:0];
 	
 	reg [2:0] Result [2:0];
-	reg [2:0] mather_to_use;
-	
+	reg [2:0] resource_to_use;
+
 	initial begin
 		Busy[0] = NOT_BUSY;
 		Busy[1] = NOT_BUSY;
@@ -442,25 +535,48 @@ module scorebored(clk, pc_in, opcode, destination_reg,source_0,source_1, should_
 	
 	always @(*) begin
 		should_fetch_stall_reg = 0;
+		resource_to_use = NO_RESOURCE;
 		if (opcode == DO_ADD || opcode == DO_SUB) begin
-			if((Busy[MATHER_0] == NOT_BUSY || Busy[MATHER_1] == NOT_BUSY) && Register_Status[destination_reg] == NO_RESOURCE) begin
+			if ((Busy[MATHER_0] == NOT_BUSY || Busy[MATHER_1] == NOT_BUSY) && Register_Status[destination_reg] == NO_RESOURCE) begin
 				// we can issue
-				mather_to_use = Busy[MATHER_0] == NOT_BUSY ? MATHER_0 : MATHER_1;
-				Busy[mather_to_use] = BUSY;
-				Dest_Register[mather_to_use] = destination_reg;
-				Source_Register_0[mather_to_use] = source_0;
-				Source_Register_1[mather_to_use] = source_1;
-				Source_Register_0_Resource[mather_to_use] = Register_Status[source_0];
-				Source_Register_1_Resource[mather_to_use] = Register_Status[source_1];
-				Source_Register_0_Ready[mather_to_use] = NOT_READY;
-				Register_Status[destination_reg] = mather_to_use;
+				resource_to_use = Busy[MATHER_0] == NOT_BUSY ? MATHER_0 : MATHER_1;
 			end else begin
 				//stall
 				should_fetch_stall_reg = 1;
 			end
 		end
+		if (opcode == DO_LOAD || opcode == DO_STORE) begin
+			if (Busy[MEMOREER_0] == NOT_BUSY && Register_Status[destination_reg] == NO_RESOURCE) begin
+				resource_to_use = MEMOREER_0;
+			end else begin
+				should_fetch_stall_reg = 1;
+			end
+		end
+
+	end
+
+	always @(posedge clk) begin
+		if (resource_to_use != NO_RESOURCE) begin
+			Busy[resource_to_use] <= BUSY;
+			Dest_Register[resource_to_use] <= destination_reg;
+			Source_Register_0[resource_to_use] <= source_0;
+			Source_Register_1[resource_to_use] <= source_1;
+			Source_Register_0_Resource[resource_to_use] <= Register_Status[source_0];
+			Source_Register_1_Resource[resource_to_use] <= Register_Status[source_1];
+			Source_Register_0_Ready[resource_to_use] <= NOT_READY;
+			Register_Status[destination_reg] <= resource_to_use;
+		end
 	end
 		
 	assign should_fetch_stall = should_fetch_stall_reg;
 
+endmodule
+
+module decoder_uno();
+endmodule
+
+module decoder_deux();
+endmodule
+
+module memoreer(clk, pc_in, operand_0, operand_1, operation, destination_in, destination_out, result, pc_out);
 endmodule
