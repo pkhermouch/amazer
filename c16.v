@@ -295,6 +295,7 @@ module mather (clk, pc_in, operand_0, operand_1, operation, destination_in, dest
 
 	output [2:0] destination_out;
 	output [15:0] result;
+	output [15:0] pc_out;
 
 	reg [15:0] result_reg;
 	reg [15:0] result_latch;
@@ -335,7 +336,7 @@ The algorithm[edit]
 The detailed algorithm for the scoreboard control is described below:
 
  function issue(op, dst, src1, src2)
-    wait until (!Busy[FU] AND !Result[dst]); // FU can be any functional unit that can execute operation op
+    wait until (!Busy[FU] AND !Register_Status[dst]); // FU can be any functional unit that can execute operation op
     Busy[FU] ← Yes;
     Op[FU] ← op;
     Fi[FU] ← dst;
@@ -345,7 +346,7 @@ The detailed algorithm for the scoreboard control is described below:
     Qk[FU] ← Result[src2];
     Rj[FU] ← not Qj;
     Rk[FU] ← not Qk;
-    Result[dst] ← FU;
+    Register_Status[dst] ← FU;
 
  function read_operands(FU)
     wait until (Rj[FU] AND Rk[FU]);
@@ -366,37 +367,100 @@ The detailed algorithm for the scoreboard control is described below:
 
 
 
-module scorebored(clk, pc_in);
+module scorebored(clk, pc_in, opcode, destination_reg,source_0,source_1, should_fetch_stall);
 
-	parameter MATHER_0 = 4'h0;
-	parameter MEMOREER_0 = 4'h1;
-	parameter NO_RESOURCE = 4'h2;
+	parameter MATHER_0 = 3'h0;
+	parameter MATHER_1 = 3'h1;
+	parameter MEMOREER_0 = 3'h2;
+	parameter NO_RESOURCE = 3'h3;
 
-	parameter DO_ADD = 4'h0;
-	parameter DO_SUB = 4'h1;
-	parameter DO_LOAD= 4'h2;
-	parameter DO_STORE=4'h3;
-	parameter DO_NOP  =4'h4; 
+	parameter DO_ADD = 3'h0;
+	parameter DO_SUB = 3'h1;
+	parameter DO_LOAD= 3'h2;
+	parameter DO_STORE=3'h3;
+	parameter DO_NOP  =3'h4; 
+
+	parameter IN_ISSUE_STATE = 3'h0;
+	parameter IN_READ_OPERANDS_STATE = 3'h1;
+	parameter IN_EXECUTE_STATE = 3'h2;
+	parameter IN_WRITEBACK_STATE = 3'h3;
+	parameter IN_INITIAL_STATE = 3'h4;
+	// ***RESOURCE STATUS, DO NOT DELETE***
+	parameter BUSY = 1'h0;
+	parameter NOT_BUSY = 1'h1;
+	// register status, not as important
+	parameter READY = 1'h0;
+	parameter NOT_READY = 1'h1;
 
 	input clk;
 	input [15:0] pc_in;
-
-	reg [3:0] Instruction_Status_Register;
-
-	reg [1:0] Busy; // indexed by MATHER_0 and shit
-	reg [1:0] Operation;
-    reg [1:0] Dest_Register;
-    reg [1:0] Source_Register_0;
-    reg [1:0] Source_Register_1;
-    reg [1:0] Source_Register_0_Resource;  
-    reg [1:0] Source_Register_1_Resource; 
-    reg [1:0] Source_Register_0_Ready;
-    reg [1:0] Source_Register_1_Ready;
-
-    reg [1:0] Result;
+	input [2:0] opcode;
+	input [2:0] destination_reg;
+	input [2:0] source_0;
+	input [2:0] source_1;
 	
+	output should_fetch_stall;
+	
+   reg should_fetch_stall_reg;
+
+	reg [2:0] Instruction_Status [2:0]; // goes with IN_???_STATE
+	reg [2:0] Register_Status [7:0];  //   what functional unit will produce the value for each register
+
+	reg [2:0] Busy [2:0]; // indexed by MATHER_0 and shit
+	reg [2:0] FU_Operations[2:0]; // the operation each FU will perform
+	reg [2:0] Dest_Register [2:0];
+	reg [2:0] Source_Register_0 [2:0];
+	reg [2:0] Source_Register_1 [2:0];
+	reg [2:0] Source_Register_0_Resource [2:0];  
+	reg [2:0] Source_Register_1_Resource [2:0]; 
+	reg [2:0] Source_Register_0_Ready [2:0];
+	reg [2:0] Source_Register_1_Ready [2:0];
+	
+	reg [2:0] Result [2:0];
+	reg [2:0] mather_to_use;
+	
+	initial begin
+		Busy[0] = NOT_BUSY;
+		Busy[1] = NOT_BUSY;
+		Busy[2] = NOT_BUSY;
+		Busy[3] = NOT_BUSY;
+		
+		Instruction_Status[0] = IN_INITIAL_STATE;
+		Instruction_Status[1] = IN_INITIAL_STATE;
+		Instruction_Status[2] = IN_INITIAL_STATE;
+		
+		Register_Status[0] = NO_RESOURCE;
+		Register_Status[1] = NO_RESOURCE;
+		Register_Status[2] = NO_RESOURCE;
+		Register_Status[3] = NO_RESOURCE;
+		Register_Status[4] = NO_RESOURCE;
+		Register_Status[5] = NO_RESOURCE;
+		Register_Status[6] = NO_RESOURCE;
+		Register_Status[7] = NO_RESOURCE;
+	end
+	
+	
+	always @(*) begin
+		should_fetch_stall_reg = 0;
+		if (opcode == DO_ADD || opcode == DO_SUB) begin
+			if((Busy[MATHER_0] == NOT_BUSY || Busy[MATHER_1] == NOT_BUSY) && Register_Status[destination_reg] == NO_RESOURCE) begin
+				// we can issue
+				mather_to_use = Busy[MATHER_0] == NOT_BUSY ? MATHER_0 : MATHER_1;
+				Busy[mather_to_use] = BUSY;
+				Dest_Register[mather_to_use] = destination_reg;
+				Source_Register_0[mather_to_use] = source_0;
+				Source_Register_1[mather_to_use] = source_1;
+				Source_Register_0_Resource[mather_to_use] = Register_Status[source_0];
+				Source_Register_1_Resource[mather_to_use] = Register_Status[source_1];
+				Source_Register_0_Ready[mather_to_use] = NOT_READY;
+				Register_Status[destination_reg] = mather_to_use;
+			end else begin
+				//stall
+				should_fetch_stall_reg = 1;
+			end
+		end
+	end
+		
+	assign should_fetch_stall = should_fetch_stall_reg;
 
 endmodule
-
-		
-
