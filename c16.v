@@ -133,44 +133,21 @@ ram2 (
 	.q_a(instruction),
 	.q_b(memory_value_out) // value out for load instructions NOPE
  	);
+wire [2:0] scorebored_op;
+wire [3:0] scorebored_source_0;
+wire [3:0] scorebored_source_1;
+wire [15:0] scorebored_pc;
+wire [2:0] scorebored_dest;
 
 decoder_uno(
 	.clk(clk),
 	.instruction(instruction),
 	.pc_in(fetch_pc),
-	.reg_0(reg_0),
-	.reg_1(reg_1),
-	.execute_op(next_x_op),
-	.reg_addr_0(reg_addr_0),
-	.reg_addr_1(reg_addr_1),
-	.arg_0(arg_0),
-	.arg_1(arg_1),
-	.pc_out(next_x_pc),
-	.dest(next_x_dest)
-	);
-
-scorebored(
-	.clk(clk),
-	.pc_in(scorebored_pc_in),
-	.opcode(scorebored_opcode_in),
-	.destination_reg(scorebored_dest),
-	.source_0(scorebored_source_0),
-	.source_1(scorebored_source_1),
-	.should_fetch_stall(stall)
-	);
-
-decoder_deux(
-	.clk(clk),
-	.execute_op(next_x_op),
-	.arg_0(arg_0),
-	.arg_1(arg_1),
-	.dest_in(next_x_dest),
-	.pc_in(next_x_pc),
-	.dest_out(reg_write_dest),
-	.reg_value_out(reg_write_value),
-	.reg_write_enable(reg_write_enable),
-	.pc_value_out(branch_pc),
-	.pc_write_enable(pc_write_enable)
+	.execute_op(scorebored_op),
+	.arg_0(scorebored_source_0),
+	.arg_1(scorebored_source_1),
+	.pc_out(scorebored_pc),
+	.dest(scorebored_dest)
 	);
 
 mather(
@@ -212,6 +189,113 @@ memoreer(
 	.result(memoreer_result),
 	.pc_out(memoreer_pc_out)
 	);
+
+// Begin scoreb0r3d modulez
+parameter MATHER_0 = 3'h0;
+parameter MATHER_1 = 3'h1;
+parameter MEMOREER_0 = 3'h2;
+parameter NO_RESOURCE = 3'h3;
+
+parameter DO_ADD = 3'h0;
+parameter DO_SUB = 3'h1;
+parameter DO_LOAD= 3'h2;
+parameter DO_STORE=3'h3;
+parameter DO_NOP  =3'h4; 
+
+parameter IN_ISSUE_STATE = 3'h0;
+parameter IN_READ_OPERANDS_STATE = 3'h1;
+parameter IN_EXECUTE_STATE = 3'h2;
+parameter IN_WRITEBACK_STATE = 3'h3;
+parameter IN_INITIAL_STATE = 3'h4;
+// ***RESOURCE STATUS, DO NOT DELETE***
+parameter BUSY = 1'h0;
+parameter NOT_BUSY = 1'h1;
+// register status, not as important
+parameter READY = 1'h0;
+parameter NOT_READY = 1'h1;
+
+output should_fetch_stall;
+
+reg should_fetch_stall_reg;
+
+
+reg [2:0] Instruction_Status [2:0]; // goes with IN_???_STATE
+reg [2:0] Register_Status [7:0];  //   what functional unit will produce the value for each register
+
+reg [2:0] Busy [2:0]; // indexed by MATHER_0 and shit
+
+reg [2:0] FU_Operations[2:0]; // the operation each FU will perform
+reg [2:0] Dest_Register [2:0];
+reg [2:0] Source_Register_0 [2:0];
+reg [2:0] Source_Register_1 [2:0];
+reg [2:0] Source_Register_0_Resource [2:0];  
+
+reg [2:0] Source_Register_1_Resource [2:0]; 
+reg [2:0] Source_Register_0_Ready [2:0];
+reg [2:0] Source_Register_1_Ready [2:0];
+
+reg [2:0] Result [2:0];
+
+reg [2:0] resource_to_use;
+
+initial begin
+	Busy[0] = NOT_BUSY;
+	Busy[1] = NOT_BUSY;
+
+	Busy[2] = NOT_BUSY;
+	Busy[3] = NOT_BUSY;
+	
+	Instruction_Status[0] = IN_INITIAL_STATE;
+	Instruction_Status[1] = IN_INITIAL_STATE;
+
+	Instruction_Status[2] = IN_INITIAL_STATE;
+	
+	Register_Status[0] = NO_RESOURCE;
+	Register_Status[1] = NO_RESOURCE;
+	Register_Status[2] = NO_RESOURCE;
+	Register_Status[3] = NO_RESOURCE;
+	Register_Status[4] = NO_RESOURCE;
+	Register_Status[5] = NO_RESOURCE;
+	Register_Status[6] = NO_RESOURCE;
+	Register_Status[7] = NO_RESOURCE;
+end
+
+
+always @(*) begin
+	should_fetch_stall_reg = 0;
+	resource_to_use = NO_RESOURCE;
+	if (scorebored_op == DO_ADD || scorebored_op == DO_SUB) begin
+		if ((Busy[MATHER_0] == NOT_BUSY || Busy[MATHER_1] == NOT_BUSY) && Register_Status[scorebored_dest] == NO_RESOURCE) begin
+			// we can issue
+			resource_to_use = Busy[MATHER_0] == NOT_BUSY ? MATHER_0 : MATHER_1;
+		end else begin
+			//stall
+			should_fetch_stall_reg = 1;
+		end
+	end
+	if (scorebored_op == DO_LOAD || scorebored_op == DO_STORE) begin
+		if (Busy[MEMOREER_0] == NOT_BUSY && Register_Status[scorebored_dest] == NO_RESOURCE) begin
+			resource_to_use = MEMOREER_0;
+		end else begin
+			should_fetch_stall_reg = 1;
+		end
+	end
+end
+
+always @(posedge clk) begin
+	if (resource_to_use != NO_RESOURCE) begin
+		Busy[resource_to_use] <= BUSY;
+		Dest_Register[resource_to_use] <= scorebored_dest;
+		Source_Register_0[resource_to_use] <= scorebored_source_0;
+		Source_Register_1[resource_to_use] <= scorebored_source_1;
+		Source_Register_0_Resource[resource_to_use] <= Register_Status[scorebored_source_0];
+		Source_Register_1_Resource[resource_to_use] <= Register_Status[scorebored_source_1];
+		Source_Register_0_Ready[resource_to_use] <= NOT_READY;
+		Register_Status[scorebored_dest] <= resource_to_use;
+	end
+end
+	
+assign should_fetch_stall = should_fetch_stall_reg;
 
 ///////////////////
 // debug support //
@@ -457,120 +541,6 @@ The detailed algorithm for the scoreboard control is described below:
     Result[Fi[FU]] ← 0;
     Busy[FU] ← No;
 */
-
-
-
-module scorebored(clk, pc_in, opcode, destination_reg, source_0, source_1, should_fetch_stall);
-
-	parameter MATHER_0 = 3'h0;
-	parameter MATHER_1 = 3'h1;
-	parameter MEMOREER_0 = 3'h2;
-	parameter NO_RESOURCE = 3'h3;
-
-	parameter DO_ADD = 3'h0;
-	parameter DO_SUB = 3'h1;
-	parameter DO_LOAD= 3'h2;
-	parameter DO_STORE=3'h3;
-	parameter DO_NOP  =3'h4; 
-
-	parameter IN_ISSUE_STATE = 3'h0;
-	parameter IN_READ_OPERANDS_STATE = 3'h1;
-	parameter IN_EXECUTE_STATE = 3'h2;
-	parameter IN_WRITEBACK_STATE = 3'h3;
-	parameter IN_INITIAL_STATE = 3'h4;
-	// ***RESOURCE STATUS, DO NOT DELETE***
-	parameter BUSY = 1'h0;
-	parameter NOT_BUSY = 1'h1;
-	// register status, not as important
-	parameter READY = 1'h0;
-	parameter NOT_READY = 1'h1;
-
-	input clk;
-	input [15:0] pc_in;
-	input [2:0] opcode;
-	input [2:0] destination_reg;
-	input [2:0] source_0;
-	input [2:0] source_1;
-	
-	output should_fetch_stall;
-	
-	reg should_fetch_stall_reg;
-
-	reg [2:0] Instruction_Status [2:0]; // goes with IN_???_STATE
-	reg [2:0] Register_Status [7:0];  //   what functional unit will produce the value for each register
-
-	reg [2:0] Busy [2:0]; // indexed by MATHER_0 and shit
-	reg [2:0] FU_Operations[2:0]; // the operation each FU will perform
-	reg [2:0] Dest_Register [2:0];
-	reg [2:0] Source_Register_0 [2:0];
-	reg [2:0] Source_Register_1 [2:0];
-	reg [2:0] Source_Register_0_Resource [2:0];  
-	reg [2:0] Source_Register_1_Resource [2:0]; 
-	reg [2:0] Source_Register_0_Ready [2:0];
-	reg [2:0] Source_Register_1_Ready [2:0];
-	
-	reg [2:0] Result [2:0];
-	reg [2:0] resource_to_use;
-
-	initial begin
-		Busy[0] = NOT_BUSY;
-		Busy[1] = NOT_BUSY;
-		Busy[2] = NOT_BUSY;
-		Busy[3] = NOT_BUSY;
-		
-		Instruction_Status[0] = IN_INITIAL_STATE;
-		Instruction_Status[1] = IN_INITIAL_STATE;
-		Instruction_Status[2] = IN_INITIAL_STATE;
-		
-		Register_Status[0] = NO_RESOURCE;
-		Register_Status[1] = NO_RESOURCE;
-		Register_Status[2] = NO_RESOURCE;
-		Register_Status[3] = NO_RESOURCE;
-		Register_Status[4] = NO_RESOURCE;
-		Register_Status[5] = NO_RESOURCE;
-		Register_Status[6] = NO_RESOURCE;
-		Register_Status[7] = NO_RESOURCE;
-	end
-	
-	
-	always @(*) begin
-		should_fetch_stall_reg = 0;
-		resource_to_use = NO_RESOURCE;
-		if (opcode == DO_ADD || opcode == DO_SUB) begin
-			if ((Busy[MATHER_0] == NOT_BUSY || Busy[MATHER_1] == NOT_BUSY) && Register_Status[destination_reg] == NO_RESOURCE) begin
-				// we can issue
-				resource_to_use = Busy[MATHER_0] == NOT_BUSY ? MATHER_0 : MATHER_1;
-			end else begin
-				//stall
-				should_fetch_stall_reg = 1;
-			end
-		end
-		if (opcode == DO_LOAD || opcode == DO_STORE) begin
-			if (Busy[MEMOREER_0] == NOT_BUSY && Register_Status[destination_reg] == NO_RESOURCE) begin
-				resource_to_use = MEMOREER_0;
-			end else begin
-				should_fetch_stall_reg = 1;
-			end
-		end
-
-	end
-
-	always @(posedge clk) begin
-		if (resource_to_use != NO_RESOURCE) begin
-			Busy[resource_to_use] <= BUSY;
-			Dest_Register[resource_to_use] <= destination_reg;
-			Source_Register_0[resource_to_use] <= source_0;
-			Source_Register_1[resource_to_use] <= source_1;
-			Source_Register_0_Resource[resource_to_use] <= Register_Status[source_0];
-			Source_Register_1_Resource[resource_to_use] <= Register_Status[source_1];
-			Source_Register_0_Ready[resource_to_use] <= NOT_READY;
-			Register_Status[destination_reg] <= resource_to_use;
-		end
-	end
-		
-	assign should_fetch_stall = should_fetch_stall_reg;
-
-endmodule
 
 module decoder_uno();
 endmodule
