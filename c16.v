@@ -218,6 +218,10 @@ parameter READY = 3'h0;
 parameter NOT_READY = 3'h1;
 parameter ACTUALLY_IMMEDIATE_VALUE = 3'h2;
 
+
+parameter USE_PC = 4'he;
+parameter USE_IMMEDIATE = 4'hf;
+
 output should_fetch_stall;
 
 reg should_fetch_stall_reg;
@@ -359,9 +363,28 @@ always @(posedge clk) begin
 		Dest_Register[resource_to_use] <= scorebored_dest;
 		Source_Register_0[resource_to_use] <= scorebored_source_0;
 		Source_Register_1[resource_to_use] <= scorebored_source_1;
-		Source_Register_0_Resource[resource_to_use] <= Register_Status[scorebored_source_0];
-		Source_Register_1_Resource[resource_to_use] <= Register_Status[scorebored_source_1];
-		Source_Register_0_Ready[resource_to_use] <= NOT_READY;
+
+		if (scoreboard_source_0 == USE_PC) begin
+			Operand_Values_0[resource_to_use] = scorebored_pc;
+			Source_Register_0_Resource[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
+		end else if (scoreboard_source_0 == USE_IMMEDIATE) begin
+			Operand_Values_0[resource_to_use] = immediate_out;
+			Source_Register_0_Resource[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
+		end else
+			Source_Register_0_Resource[resource_to_use] <= Register_Status[scorebored_source_0];
+		end
+
+		if (scoreboard_source_1 == USE_PC) begin
+			Operand_Values_1[resource_to_use] = scorebored_pc;
+			Source_Register_1_Resource[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
+		end else if (scoreboard_source_1 == USE_IMMEDIATE) begin
+			Operand_Values_1[resource_to_use] = immediate_out;
+			Source_Register_1_Resource[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
+		end else
+			Source_Register_1_Resource[resource_to_use] <= Register_Status[scorebored_source_1];
+		end
+
+		
 		Register_Status[scorebored_dest] <= resource_to_use;
 	end
 end
@@ -646,13 +669,16 @@ module decoder_uno(clk, instruction, pc_in, execute_op, arg_0, arg_1, pc_out, im
 	parameter DO_STORE=3'h3;
 	parameter DO_NOP  =3'h4; 
 
+	parameter USE_PC = 4'he;
+	parameter USE_IMMEDIATE = 4'hf;
+
 	input clk;
 	input [15:0] instruction;
 	input [15:0] pc_in;
 
 	output [2:0] execute_op;
-	output [2:0] arg_0;
-	output [2:0] arg_1;
+	output [3:0] arg_0;
+	output [3:0] arg_1;
 	output [15:0] pc_out;
 	output [15:0] immediate_out;
 	output [2:0]  dest;
@@ -667,38 +693,38 @@ module decoder_uno(clk, instruction, pc_in, execute_op, arg_0, arg_1, pc_out, im
 	always @(*) begin
 		
 
-		dest_reg = rd;
-		execute_op_reg = NOP;
+		execute_op_reg = DO_NOP;
 		arg_0_reg = 0;
 		arg_1_reg = 0;
-		reg_addr_1_reg = instruction[2:0];
+
+		dest_reg = instruction[10:8];	
 		case (opcode)
 			// Add, f = 0
 			5'b00000: begin
 				execute_op_reg = DO_ADD;
 				arg_0_reg = reg_0;
-				arg_1_reg = imm5;
+				immediate_out_reg = $signed (instruction[4:0]);
 			end
 
 			// Add, f = 1
 			5'b00001: begin
 				execute_op_reg = DO_ADD;
-				arg_0_reg = reg_0;
-				arg_1_reg = reg_1;
+				arg_0_reg = instruction[7:5];
+				arg_1_reg = instruction[2:0;
 			end
 
 			// do sub
 			5'b00010: begin
 				execute_op_reg = DO_SUB;
 				arg_0_reg = reg_0;
-				arg_1_reg = imm5;
+				immediate_out_reg = $signed (instruction[4:0]);
 			end
 
 			// sub, f = 1
 			5'b00011: begin
 				execute_op_reg = DO_SUB;
-				arg_0_reg = reg_0;
-				arg_1_reg = reg_1;
+				arg_0_reg = instruction[7:5];
+				arg_1_reg = instruction[2:0;
 			end
 
 // loads and stores are broken up into two micro ops
@@ -708,41 +734,29 @@ module decoder_uno(clk, instruction, pc_in, execute_op, arg_0, arg_1, pc_out, im
 			// ld, f = 0
 			5'b10100: begin
 				execute_op_reg = DO_LOAD;
-				arg_0_reg = reg_0;
-				arg_1_reg = imm5;
-				dest_reg = 7;
-				next_decode_op = LD;
-				stall_reg = 1;
+				arg_0_reg = instruction[7:5];
+				immediate_out_reg = $signed (instruction[4:0]);
 			end
 			
 			// ld, f = 1
 			5'b10101: begin
 				execute_op_reg = DO_LOAD;
 				arg_0_reg = pc_in;
-				arg_1_reg = imm8;
-				dest_reg = 7;
-				next_decode_op = LD;
-				stall_reg = 1;
+				immediate_out_reg = $signed (instruction[4:0]);
 			end
 			
 			// st, f = 0
 			5'b10110: begin
 				execute_op_reg = DO_STORE;
-				arg_0_reg = reg_0;
-				arg_1_reg = imm5;
-				dest_reg = 7;
-				next_decode_op = ST;
-				stall_reg = 1;
+				arg_0_reg = instruction[7:5];
+				immediate_out_reg = $signed (instruction[4:0]);
 			end
 			
 			//st, f = 1
 			5'b10111: begin
 				execute_op_reg = DO_STORE;
 				arg_0_reg = pc_in;
-				arg_1_reg = imm8;
-				dest_reg = 7;
-				next_decode_op = ST;
-				stall_reg = 1;
+				immediate_out_reg = $signed (instruction[4:0]);
 			end
 
 
@@ -750,7 +764,7 @@ module decoder_uno(clk, instruction, pc_in, execute_op, arg_0, arg_1, pc_out, im
 	end
 
 	assign pc_out = pc_in;
-assign execute_op = execute_op_reg;
+	assign execute_op = execute_op_reg;
 	assign arg_0 = arg_0_reg;
 	assign arg_1 = arg_1_reg;
 	assign immediate_out = immediate_out_reg;
@@ -758,8 +772,6 @@ assign execute_op = execute_op_reg;
 
 endmodule
 
-module decoder_deux();
-endmodule
 
 module memoreer(clk, pc_in, operand_0, operand_1, operation, destination_in, destination_out, result, pc_out);
 endmodule
