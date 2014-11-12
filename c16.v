@@ -208,11 +208,13 @@ parameter IN_EXECUTE_STATE = 3'h2;
 parameter IN_WRITEBACK_STATE = 3'h3;
 parameter IN_INITIAL_STATE = 3'h4;
 // ***RESOURCE STATUS, DO NOT DELETE***
-parameter BUSY = 1'h0;
-parameter NOT_BUSY = 1'h1;
+parameter BUSY = 3'h0;
+parameter NOT_BUSY = 3'h1;
+parameter BUSY_AND_WORKING = 3'h2;
 // register status, not as important
-parameter READY = 1'h0;
-parameter NOT_READY = 1'h1;
+parameter READY = 3'h0;
+parameter NOT_READY = 3'h1;
+parameter ACTUALLY_IMMEDIATE_VALUE = 3'h2;
 
 output should_fetch_stall;
 
@@ -226,13 +228,15 @@ reg [2:0] Busy [2:0]; // indexed by MATHER_0 and shit
 
 reg [2:0] FU_Operations[2:0]; // the operation each FU will perform
 reg [2:0] Dest_Register [2:0];
-reg [2:0] Source_Register_0 [2:0];
+reg [2:0] Source_Register_0 [2:0]; // register number for operand 0
 reg [2:0] Source_Register_1 [2:0];
-reg [2:0] Source_Register_0_Resource [2:0];  
-
+reg [2:0] Source_Register_0_Resource [2:0];  // where operand 0 is being computed
 reg [2:0] Source_Register_1_Resource [2:0]; 
-reg [2:0] Source_Register_0_Ready [2:0];
+reg [2:0] Source_Register_0_Ready [2:0];     // whether or not the register for operand 0 is ready to be used or in use by something else
 reg [2:0] Source_Register_1_Ready [2:0];
+
+reg [15:0] Operand_Values_0[2:0];
+reg [15:0] Operand_Values_1[2:0];
 
 reg [2:0] Result [2:0];
 
@@ -280,6 +284,71 @@ always @(*) begin
 			should_fetch_stall_reg = 1;
 		end
 	end
+
+
+	mather_0_operation = DO_NOP;
+	mather_1_operation = DO_NOP;
+	memoreer_0_operation = DO_NOP;
+	
+	if (Busy[MATHER_0] == BUSY) begin
+		if (Source_Register_0_Ready[MATHER_0] != NOT_READY  && Source_Register_1_Ready[MATHER_0] != NOT_READY) begin
+			mather_0_operation = FU_Operations[MATHER_0];
+
+			// both sources are ready. send data to functional unit
+			if (Source_Register_0_Ready[MATHER_0] == READY) begin
+				read_addr_0 = Source_Register_0[MATHER_0];
+				Operand_Values_0[MATHER_0] = read_value_0;
+			end else if(Source_Register_0_Ready[MATHER_0] == ACTUALLY_IMMEDIATE_VALUE) begin
+				//n nothing, because immediate value are by default placed in Operand_Values_0/1
+			end
+
+			if (Source_Register_1_Ready[MATHER_0] == READY) begin
+				read_addr_1 = Source_Register_1[MATHER_0];
+				Operand_Values_1[MATHER_0] = read_value_1;
+			end else if(Source_Register_1_Ready[MATHER_0] == ACTUALLY_IMMEDIATE_VALUE) begin
+				//n nothing, because immediate value are by default placed in Operand_Values_0/1
+			end
+
+		end
+	end
+
+	if (Busy[MATHER_1] == BUSY) begin
+		if (Source_Register_0_Ready[MATHER_1] != NOT_READY  && Source_Register_1_Ready[MATHER_1] != NOT_READY) begin
+			mather_1_operation = FU_Operations[MATHER_1];
+
+			// both sources are ready. send data to functional unit
+			if (Source_Register_0_Ready[MATHER_1] == READY) begin
+				read_addr_2 = Source_Register_0[MATHER_1];
+				Operand_Values_0[MATHER_1] = read_value_2;
+			end else if(Source_Register_0_Ready[MATHER_1] == ACTUALLY_IMMEDIATE_VALUE) begin
+				//n nothing, because immediate value are by default placed in Operand_Values_0/1
+			end
+
+			if (Source_Register_1_Ready[MATHER_1] == READY) begin
+				read_addr_3 = Source_Register_1[MATHER_1];
+				Operand_Values_1[MATHER_1] = read_value_3;
+			end else if(Source_Register_1_Ready[MATHER_1] == ACTUALLY_IMMEDIATE_VALUE) begin
+				//n nothing, because immediate value are by default placed in Operand_Values_0/1
+			end
+
+		end
+	end
+
+	if (Busy[MEMOREER_0] == BUSY) begin
+		if (Source_Register_0_Ready[MEMOREER_0] != NOT_READY  && Source_Register_1_Ready[MEMOREER_0] != NOT_READY) begin
+			memoreer_0_operation = FU_Operations[MEMOREER_0];
+
+			// both sources are ready. send data to functional unit
+			if (Source_Register_0_Ready[MEMOREER_0] == READY) begin
+				read_addr_4 = Source_Register_0[MEMOREER_0];
+				Operand_Values_0[MEMOREER_0] = read_value_4;
+			end else if(Source_Register_0_Ready[MEMOREER_0] == ACTUALLY_IMMEDIATE_VALUE) begin
+				//n nothing, because immediate value are by default placed in Operand_Values_0/1
+			end
+
+		end
+	end
+
 end
 
 always @(posedge clk) begin
@@ -325,25 +394,49 @@ endmodule
 /////////////////////////
 // REGISTER FILE       //
 /////////////////////////
-module registers(clk, read_addr_0, read_addr_1, read_addr_dbg, write_addr, write_value, write_enable, read_value_0, read_value_1, read_value_dbg);
+module registers(
+		clk, read_addr_dbg, read_value_dbg,
+		read_addr_0, read_addr_1, read_addr_2, read_addr_3, read_addr_4,  
+		read_value_0, read_value_1, read_value_2, read_value_3, read_value_4,
+		write_addr_0, write_addr_1, write_addr_2, 
+		write_value_0, write_value_1, write_value_2 
+		);
+
+	input clk;
+	input[2:0] read_addr_dbg;
+	output[15:0] read_value_dbg;
+
 
 	input[2:0] read_addr_0;
 	input[2:0] read_addr_1;
-	input[2:0] read_addr_dbg;
-	input[2:0] write_addr;
+	input[2:0] read_addr_2;
+	input[2:0] read_addr_3;
+	input[2:0] read_addr_4;
+	input[2:0] write_addr_0;
+	input[2:0] write_addr_1;
+	input[2:0] write_addr_2;
 
-	input write_enable;
-	input clk;
-
-	input[15:0] write_value;
+	input[15:0] write_value_0;
+	input[15:0] write_value_1;
+	input[15:0] write_value_2;
 
 	output[15:0] read_value_0;
 	output[15:0] read_value_1;
-	output[15:0] read_value_dbg;
+	output[15:0] read_value_2;
+	output[15:0] read_value_3;
+	output[15:0] read_value_4;
 
 	reg[15:0] rv0;
 	reg[15:0] rv1;
+	reg[15:0] rv2;
+	reg[15:0] rv3;
+	reg[15:0] rv4;
 	reg[15:0] rvdbg;
+
+	reg[15:0] all_read_addrs[5:0] = {read_addr_0,read_addr_1,read_add_2,read_addr_3,read_addr_4,read_addr_dbg};
+	reg[15:0] all_write_addrs[2:0] = {write_addr_0,write_addr_1,write_addr_2};
+	reg[15:0] all_write_values[2:0] = {write_value_0,write_value_1,write_value_2};
+	reg[15:0] all_rv[5:0];
 
 	reg [15:0]regs[7:0];
 	initial begin
@@ -358,31 +451,31 @@ module registers(clk, read_addr_0, read_addr_1, read_addr_dbg, write_addr, write
 	end
 
 	always @(*) begin
-		rv0 = regs[read_addr_0];
-		rv1 = regs[read_addr_1];
-		rvdbg = regs[read_addr_dbg];
-		if (write_enable && write_addr != 7) begin
-			if (write_addr == read_addr_0) begin
-				rv0 = write_value;
-			end
-			if (write_addr == read_addr_1) begin
-				rv1 = write_value;
-			end
-			if (write_addr == read_addr_dbg) begin
-				rvdbg = write_value;
+
+		for(i = 0; i < 6; i = i + 1) begin
+			all_rv[i] = all_read_addrs[i];
+			for(j = 0; j < 3; j = j + 1) begin
+				if(all_write_addrs[j] != 7 && all_read_addrs[i] == all_write_addrs[j]) begin
+					all_rv[i] = all_write_values[j];
+				end
 			end
 		end
 	end
 
 	always @(posedge clk) begin
-		if (write_enable && write_addr != 7) begin
-			regs[write_addr] <= write_value;
+		for(i = 0; i < 3; i = i + 1) begin		
+			if (all_write_addrs[i] != 7) begin
+				regs[all_write_addrs[i]] <= all_write_values[i];
+			end
 		end
 	end
 
-	assign read_value_0 = rv0;
-	assign read_value_1 = rv1;
-	assign read_value_dbg = rvdbg;
+	assign read_value_0 = all_rv[0];
+	assign read_value_0 = all_rv[1];
+	assign read_value_0 = all_rv[2];
+	assign read_value_0 = all_rv[3];
+	assign read_value_0 = all_rv[4];
+	assign read_value_dbg = all_rv[5];
 
 endmodule
 
