@@ -138,6 +138,7 @@ wire [3:0] scorebored_source_0;
 wire [3:0] scorebored_source_1;
 wire [15:0] scorebored_pc;
 wire [2:0] scorebored_dest;
+wire [15:0] immediate_out;
 
 decoder_uno(
 	.clk(clk),
@@ -147,6 +148,7 @@ decoder_uno(
 	.arg_0(scorebored_source_0),
 	.arg_1(scorebored_source_1),
 	.pc_out(scorebored_pc),
+	.immediate_out(immediate_out),
 	.dest(scorebored_dest)
 	);
 
@@ -635,7 +637,125 @@ The detailed algorithm for the scoreboard control is described below:
     Busy[FU] ← No;
 */
 
-module decoder_uno();
+module decoder_uno(clk, instruction, pc_in, execute_op, arg_0, arg_1, pc_out, immediate_out, dest);
+
+	parameter DO_ADD = 3'h0;
+
+	parameter DO_SUB = 3'h1;
+	parameter DO_LOAD= 3'h2;
+	parameter DO_STORE=3'h3;
+	parameter DO_NOP  =3'h4; 
+
+	input clk;
+	input [15:0] instruction;
+	input [15:0] pc_in;
+
+	output [2:0] execute_op;
+	output [2:0] arg_0;
+	output [2:0] arg_1;
+	output [15:0] pc_out;
+	output [15:0] immediate_out;
+	output [2:0]  dest;
+
+	reg [2:0] execute_op_reg;
+	reg [2:0] arg_0_reg;
+	reg [2:0] arg_1_reg;
+	reg [15:0] immediate_out_reg;
+	reg [2:0] dest_reg;
+
+
+	always @(*) begin
+		
+
+		dest_reg = rd;
+		execute_op_reg = NOP;
+		arg_0_reg = 0;
+		arg_1_reg = 0;
+		reg_addr_1_reg = instruction[2:0];
+		case (opcode)
+			// Add, f = 0
+			5'b00000: begin
+				execute_op_reg = DO_ADD;
+				arg_0_reg = reg_0;
+				arg_1_reg = imm5;
+			end
+
+			// Add, f = 1
+			5'b00001: begin
+				execute_op_reg = DO_ADD;
+				arg_0_reg = reg_0;
+				arg_1_reg = reg_1;
+			end
+
+			// do sub
+			5'b00010: begin
+				execute_op_reg = DO_SUB;
+				arg_0_reg = reg_0;
+				arg_1_reg = imm5;
+			end
+
+			// sub, f = 1
+			5'b00011: begin
+				execute_op_reg = DO_SUB;
+				arg_0_reg = reg_0;
+				arg_1_reg = reg_1;
+			end
+
+// loads and stores are broken up into two micro ops
+			// the first does the addition and pipes the result to magical register 8,
+			// and the second micro op issues a load/store from/to the value in register 8
+			
+			// ld, f = 0
+			5'b10100: begin
+				execute_op_reg = DO_LOAD;
+				arg_0_reg = reg_0;
+				arg_1_reg = imm5;
+				dest_reg = 7;
+				next_decode_op = LD;
+				stall_reg = 1;
+			end
+			
+			// ld, f = 1
+			5'b10101: begin
+				execute_op_reg = DO_LOAD;
+				arg_0_reg = pc_in;
+				arg_1_reg = imm8;
+				dest_reg = 7;
+				next_decode_op = LD;
+				stall_reg = 1;
+			end
+			
+			// st, f = 0
+			5'b10110: begin
+				execute_op_reg = DO_STORE;
+				arg_0_reg = reg_0;
+				arg_1_reg = imm5;
+				dest_reg = 7;
+				next_decode_op = ST;
+				stall_reg = 1;
+			end
+			
+			//st, f = 1
+			5'b10111: begin
+				execute_op_reg = DO_STORE;
+				arg_0_reg = pc_in;
+				arg_1_reg = imm8;
+				dest_reg = 7;
+				next_decode_op = ST;
+				stall_reg = 1;
+			end
+
+
+		endcase
+	end
+
+	assign pc_out = pc_in;
+assign execute_op = execute_op_reg;
+	assign arg_0 = arg_0_reg;
+	assign arg_1 = arg_1_reg;
+	assign immediate_out = immediate_out_reg;
+	assign dest = dest_reg;
+
 endmodule
 
 module decoder_deux();
