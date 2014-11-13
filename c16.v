@@ -41,45 +41,45 @@ output		     [6:0]		HEX3;
 
 wire clk = KEY[0];        // single step using key0
 
-wire[15:0] reg_0;
-wire[15:0] reg_1;
-wire[15:0] reg_2;
-wire[15:0] reg_3;
-wire[15:0] reg_4;
+wire[15:0] reg_value_0;
+wire[15:0] reg_value_1;
+wire[15:0] reg_value_2;
+wire[15:0] reg_value_3;
+wire[15:0] reg_value_4;
 wire[15:0] reg_dbg;
 
-wire[2:0] reg_addr_0;
-wire[2:0] reg_addr_1;
-wire[2:0] reg_addr_2;
-wire[2:0] reg_addr_3;
-wire[2:0] reg_addr_4;
+reg[2:0] reg_addr_0;
+reg[2:0] reg_addr_1;
+reg[2:0] reg_addr_2;
+reg[2:0] reg_addr_3;
+reg[2:0] reg_addr_4;
 
-wire [15:0] mather_0_pc_in;
-wire [15:0] mather_0_operand_0;
-wire [15:0] mather_0_operand_1;
-wire [2:0] mather_0_operation;
-wire [2:0] mather_0_dest_in; // E 
+reg [15:0] mather_0_pc_in;
+reg [15:0] mather_0_operand_0;
+reg [15:0] mather_0_operand_1;
+reg [2:0] mather_0_operation;
+reg [2:0] mather_0_dest_in; // E 
 wire [2:0] mather_0_dest_out;
 wire [15:0] mather_0_result;
 wire [15:0] mather_0_pc_out;
 
-wire [15:0] mather_1_pc_in;
-wire [15:0] mather_1_operand_0;
-wire [15:0] mather_1_operand_1;
-wire [2:0] mather_1_operation;
-wire [2:0] mather_1_dest_in; // E 
+reg [15:0] mather_1_pc_in;
+reg [15:0] mather_1_operand_0;
+reg [15:0] mather_1_operand_1;
+reg [2:0] mather_1_operation;
+reg [2:0] mather_1_dest_in; // E 
 wire [2:0] mather_1_dest_out;
 wire [15:0] mather_1_result;
 wire [15:0] mather_1_pc_out;
 
-wire [15:0] memoreer_pc_in;
-wire [15:0] memoreer_operand_0;
-wire [15:0] memoreer_operand_1;
-wire [2:0] memoreer_operation;
-wire [2:0] memoreer_dest_in; // E 
-wire [2:0] memoreer_dest_out;
-wire [15:0] memoreer_result;
-wire [15:0] memoreer_pc_out;
+reg [15:0] memoreer_0_pc_in;
+reg [15:0] memoreer_0_operand_0;
+reg [15:0] memoreer_0_operand_1;
+reg [2:0] memoreer_0_operation;
+reg [2:0] memoreer_0_dest_in; // E 
+wire [2:0] memoreer_0_dest_out;
+wire [15:0] memoreer_0_result;
+wire [15:0] memoreer_0_pc_out;
 
 registers(
 	.clk(clk),
@@ -95,11 +95,11 @@ registers(
 	.write_value_1(mather_1_result),
 	.write_addr_2(memoreer_dest_out),
 	.write_value_2(memoreer_result),
-	.read_value_0(reg_0),
-	.read_value_1(reg_1),
-	.read_value_2(reg_2),
-	.read_value_3(reg_3),
-	.read_value_4(reg_4),
+	.read_value_0(reg_value_0),
+	.read_value_1(reg_value_1),
+	.read_value_2(reg_value_2),
+	.read_value_3(reg_value_3),
+	.read_value_4(reg_value_4),
 	.read_value_dbg(reg_dbg)
 	);
 
@@ -222,8 +222,6 @@ parameter ACTUALLY_IMMEDIATE_VALUE = 3'h2;
 parameter USE_PC = 4'he;
 parameter USE_IMMEDIATE = 4'hf;
 
-output should_fetch_stall;
-
 reg should_fetch_stall_reg;
 
 
@@ -251,10 +249,8 @@ reg [2:0] resource_to_use;
 initial begin
 	Busy[0] = NOT_BUSY;
 	Busy[1] = NOT_BUSY;
-
 	Busy[2] = NOT_BUSY;
-	Busy[3] = NOT_BUSY;
-	
+
 	Instruction_Status[0] = IN_INITIAL_STATE;
 	Instruction_Status[1] = IN_INITIAL_STATE;
 
@@ -302,15 +298,15 @@ always @(*) begin
 
 			// both sources are ready. send data to functional unit
 			if (Source_Register_0_Ready[MATHER_0] == READY) begin
-				read_addr_0 = Source_Register_0[MATHER_0];
-				Operand_Values_0[MATHER_0] = read_value_0;
+				reg_addr_0 = Source_Register_0[MATHER_0];
+				Operand_Values_0[MATHER_0] = reg_value_0;
 			end else if(Source_Register_0_Ready[MATHER_0] == ACTUALLY_IMMEDIATE_VALUE) begin
 				//n nothing, because immediate value are by default placed in Operand_Values_0/1
 			end
 
 			if (Source_Register_1_Ready[MATHER_0] == READY) begin
-				read_addr_1 = Source_Register_1[MATHER_0];
-				Operand_Values_1[MATHER_0] = read_value_1;
+				reg_addr_1 = Source_Register_1[MATHER_0];
+				Operand_Values_1[MATHER_0] = reg_value_1;
 			end else if(Source_Register_1_Ready[MATHER_0] == ACTUALLY_IMMEDIATE_VALUE) begin
 				//n nothing, because immediate value are by default placed in Operand_Values_0/1
 			end
@@ -324,15 +320,15 @@ always @(*) begin
 
 			// both sources are ready. send data to functional unit
 			if (Source_Register_0_Ready[MATHER_1] == READY) begin
-				read_addr_2 = Source_Register_0[MATHER_1];
-				Operand_Values_0[MATHER_1] = read_value_2;
+				reg_addr_2 = Source_Register_0[MATHER_1];
+				Operand_Values_0[MATHER_1] = reg_value_2;
 			end else if(Source_Register_0_Ready[MATHER_1] == ACTUALLY_IMMEDIATE_VALUE) begin
 				//n nothing, because immediate value are by default placed in Operand_Values_0/1
 			end
 
 			if (Source_Register_1_Ready[MATHER_1] == READY) begin
-				read_addr_3 = Source_Register_1[MATHER_1];
-				Operand_Values_1[MATHER_1] = read_value_3;
+				reg_addr_3 = Source_Register_1[MATHER_1];
+				Operand_Values_1[MATHER_1] = reg_value_3;
 			end else if(Source_Register_1_Ready[MATHER_1] == ACTUALLY_IMMEDIATE_VALUE) begin
 				//n nothing, because immediate value are by default placed in Operand_Values_0/1
 			end
@@ -346,8 +342,8 @@ always @(*) begin
 
 			// both sources are ready. send data to functional unit
 			if (Source_Register_0_Ready[MEMOREER_0] == READY) begin
-				read_addr_4 = Source_Register_0[MEMOREER_0];
-				Operand_Values_0[MEMOREER_0] = read_value_4;
+				reg_addr_4 = Source_Register_0[MEMOREER_0];
+				Operand_Values_0[MEMOREER_0] = reg_value_4;
 			end else if(Source_Register_0_Ready[MEMOREER_0] == ACTUALLY_IMMEDIATE_VALUE) begin
 				//n nothing, because immediate value are by default placed in Operand_Values_0/1
 			end
@@ -364,26 +360,25 @@ always @(posedge clk) begin
 		Source_Register_0[resource_to_use] <= scorebored_source_0;
 		Source_Register_1[resource_to_use] <= scorebored_source_1;
 
-		if (scoreboard_source_0 == USE_PC) begin
+		if (scorebored_source_0 == USE_PC) begin
 			Operand_Values_0[resource_to_use] = scorebored_pc;
 			Source_Register_0_Resource[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
-		end else if (scoreboard_source_0 == USE_IMMEDIATE) begin
+		end else if (scorebored_source_0 == USE_IMMEDIATE) begin
 			Operand_Values_0[resource_to_use] = immediate_out;
 			Source_Register_0_Resource[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
-		end else
+		end else begin
 			Source_Register_0_Resource[resource_to_use] <= Register_Status[scorebored_source_0];
 		end
 
-		if (scoreboard_source_1 == USE_PC) begin
+		if (scorebored_source_1 == USE_PC) begin
 			Operand_Values_1[resource_to_use] = scorebored_pc;
 			Source_Register_1_Resource[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
-		end else if (scoreboard_source_1 == USE_IMMEDIATE) begin
+		end else if (scorebored_source_1 == USE_IMMEDIATE) begin
 			Operand_Values_1[resource_to_use] = immediate_out;
 			Source_Register_1_Resource[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
-		end else
+		end else begin
 			Source_Register_1_Resource[resource_to_use] <= Register_Status[scorebored_source_1];
 		end
-
 		
 		Register_Status[scorebored_dest] <= resource_to_use;
 	end
@@ -396,7 +391,7 @@ assign should_fetch_stall = should_fetch_stall_reg;
 ///////////////////
 reg [15:0]debug;
 
-assign LEDR = next_x_pc[9:0];//fetch_pc[9:0];
+assign LEDR = fetch_pc[9:0];
 
 display(debug[15:12], HEX3);
 display(debug[11:8], HEX2);
@@ -411,7 +406,6 @@ always @(*) begin
 		debug = reg_dbg;
 	end
 end
-
 
 endmodule
 
@@ -430,7 +424,6 @@ module registers(
 	input clk;
 	input[2:0] read_addr_dbg;
 	output[15:0] read_value_dbg;
-
 
 	input[2:0] read_addr_0;
 	input[2:0] read_addr_1;
@@ -458,7 +451,11 @@ module registers(
 	reg[15:0] rv4;
 	reg[15:0] rvdbg;
 
-	reg[15:0] all_read_addrs[5:0] = {read_addr_0,read_addr_1,read_add_2,read_addr_3,read_addr_4,read_addr_dbg};
+	// How do I for loop?
+	reg [3:0] i;
+	reg [3:0] j;
+
+	reg[15:0] all_read_addrs[5:0] = {read_addr_0,read_addr_1,read_addr_2,read_addr_3,read_addr_4,read_addr_dbg};
 	reg[15:0] all_write_addrs[2:0] = {write_addr_0,write_addr_1,write_addr_2};
 	reg[15:0] all_write_values[2:0] = {write_value_0,write_value_1,write_value_2};
 	reg[15:0] all_rv[5:0];
@@ -476,7 +473,6 @@ module registers(
 	end
 
 	always @(*) begin
-
 		for(i = 0; i < 6; i = i + 1) begin
 			all_rv[i] = all_read_addrs[i];
 			for(j = 0; j < 3; j = j + 1) begin
@@ -689,10 +685,8 @@ module decoder_uno(clk, instruction, pc_in, execute_op, arg_0, arg_1, pc_out, im
 	reg [15:0] immediate_out_reg;
 	reg [2:0] dest_reg;
 
-
+	wire [4:0] opcode = instruction[15:11];
 	always @(*) begin
-		
-
 		execute_op_reg = DO_NOP;
 		arg_0_reg = 0;
 		arg_1_reg = 0;
@@ -702,7 +696,7 @@ module decoder_uno(clk, instruction, pc_in, execute_op, arg_0, arg_1, pc_out, im
 			// Add, f = 0
 			5'b00000: begin
 				execute_op_reg = DO_ADD;
-				arg_0_reg = reg_0;
+				arg_0_reg = instruction[7:5];
 				immediate_out_reg = $signed (instruction[4:0]);
 			end
 
@@ -710,13 +704,13 @@ module decoder_uno(clk, instruction, pc_in, execute_op, arg_0, arg_1, pc_out, im
 			5'b00001: begin
 				execute_op_reg = DO_ADD;
 				arg_0_reg = instruction[7:5];
-				arg_1_reg = instruction[2:0;
+				arg_1_reg = instruction[2:0];
 			end
 
 			// do sub
 			5'b00010: begin
 				execute_op_reg = DO_SUB;
-				arg_0_reg = reg_0;
+				arg_0_reg = instruction[7:5];
 				immediate_out_reg = $signed (instruction[4:0]);
 			end
 
@@ -724,7 +718,7 @@ module decoder_uno(clk, instruction, pc_in, execute_op, arg_0, arg_1, pc_out, im
 			5'b00011: begin
 				execute_op_reg = DO_SUB;
 				arg_0_reg = instruction[7:5];
-				arg_1_reg = instruction[2:0;
+				arg_1_reg = instruction[2:0];
 			end
 
 // loads and stores are broken up into two micro ops
@@ -774,4 +768,15 @@ endmodule
 
 
 module memoreer(clk, pc_in, operand_0, operand_1, operation, destination_in, destination_out, result, pc_out);
+	input clk;
+	input [15:0] pc_in;
+	input [15:0] operand_0;
+	input [15:0] operand_1;
+	input [3:0] operation;
+	input [3:0] destination_in;
+
+	output [3:0] destination_out;
+	output [15:0] result;
+	output [15:0] pc_out;
+
 endmodule
