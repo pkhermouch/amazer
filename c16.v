@@ -115,7 +115,6 @@ fetcher(
 	.pc_write_enable(pc_write_enable),
 	.pc_in(branch_pc),
 	.pc_out(fetch_pc),
-	.instruction(instruction),
 	.stall(should_fetch_stall)
 	);
 wire [15:0] memoreer_addr;
@@ -187,7 +186,7 @@ memoreer(
 	.operation(memoreer_operation),
 	.destination_in(memoreer_dest_in), // E 
 	.destination_out(memoreer_dest_out),
-	.store_addr(memoreer_addr),
+	.mem_addr_out(memoreer_addr),
 	.mem_wren(memory_wren),
 	.store_value(memory_value_in),
 	.load_value(memory_value_out),
@@ -247,6 +246,7 @@ reg [15:0] Operand_Values_0[2:0];
 reg [15:0] Operand_Values_1[2:0];
 
 reg [2:0] Result [2:0];
+reg [2:0] i;
 
 reg [2:0] resource_to_use;
 
@@ -443,6 +443,7 @@ assign should_fetch_stall = should_fetch_stall_reg;
 reg [15:0]debug;
 
 assign LEDR = fetch_pc[9:0];
+assign LEDG = {should_fetch_stall, 7'h0};
 
 display(debug[15:12], HEX3);
 display(debug[11:8], HEX2);
@@ -451,7 +452,9 @@ display(debug[3:0], HEX0);
 
 // what do we display
 always @(*) begin
-   if (SW[3]) begin
+	if (SW[4]) begin
+		debug = {1'b0, scorebored_op, scorebored_source_0, scorebored_source_1, 1'b0, scorebored_dest};
+   end else if (SW[3]) begin
 		debug = instruction;
 	end else begin
 		debug = reg_dbg;
@@ -506,12 +509,27 @@ module registers(
 	reg [3:0] i;
 	reg [3:0] j;
 
-	reg[15:0] all_read_addrs[5:0] = {read_addr_0,read_addr_1,read_addr_2,read_addr_3,read_addr_4,read_addr_dbg};
-	reg[15:0] all_write_addrs[2:0] = {write_addr_0,write_addr_1,write_addr_2};
-	reg[15:0] all_write_values[2:0] = {write_value_0,write_value_1,write_value_2};
+	wire[15:0] all_read_addrs[5:0];
+	wire[15:0] all_write_addrs[2:0];
+	wire[15:0] all_write_values[2:0];
 	reg[15:0] all_rv[5:0];
 
 	reg [15:0]regs[7:0];
+	
+	assign all_read_addrs[0] = read_addr_0;
+	assign all_read_addrs[1] = read_addr_1;
+	assign all_read_addrs[2] = read_addr_2;
+	assign all_read_addrs[3] = read_addr_3;
+	assign all_read_addrs[4] = read_addr_4;
+	assign all_read_addrs[5] = read_addr_dbg;
+	
+	assign all_write_addrs[0] = write_addr_0;
+	assign all_write_addrs[1] = write_addr_1;
+	assign all_write_addrs[2] = write_addr_2;
+	assign all_write_values[0] = write_value_0;
+	assign all_write_values[1] = write_value_1;
+	assign all_write_values[2] = write_value_2;
+	
 	initial begin
 		regs[0] = 0;
 		regs[1] = 0;
@@ -525,7 +543,7 @@ module registers(
 
 	always @(*) begin
 		for(i = 0; i < 6; i = i + 1) begin
-			all_rv[i] = all_read_addrs[i];
+			all_rv[i] = regs[all_read_addrs[i]];
 			for(j = 0; j < 3; j = j + 1) begin
 				if(all_write_addrs[j] != 7 && all_read_addrs[i] == all_write_addrs[j]) begin
 					all_rv[i] = all_write_values[j];
@@ -543,10 +561,10 @@ module registers(
 	end
 
 	assign read_value_0 = all_rv[0];
-	assign read_value_0 = all_rv[1];
-	assign read_value_0 = all_rv[2];
-	assign read_value_0 = all_rv[3];
-	assign read_value_0 = all_rv[4];
+	assign read_value_1 = all_rv[1];
+	assign read_value_2 = all_rv[2];
+	assign read_value_3 = all_rv[3];
+	assign read_value_4 = all_rv[4];
 	assign read_value_dbg = all_rv[5];
 
 endmodule
@@ -555,7 +573,7 @@ endmodule
 /////////////////////////
 // FETCH STAGE         //
 /////////////////////////
-module fetcher(clk, pc_write_enable, pc_in, pc_out, instruction, stall);
+module fetcher(clk, pc_write_enable, pc_in, pc_out, stall);
 
 	input clk;
 	input pc_write_enable;
@@ -564,12 +582,9 @@ module fetcher(clk, pc_write_enable, pc_in, pc_out, instruction, stall);
 	input[15:0] pc_in;
 
 	output[15:0] pc_out;
-	output[15:0] instruction;
 
 	reg[15:0] fetch_pc;
 	reg[15:0] next_fetch_pc;
-
-	wire [15:0]mem_out;
 
 	initial begin
 		fetch_pc = -1;
@@ -590,7 +605,6 @@ module fetcher(clk, pc_write_enable, pc_in, pc_out, instruction, stall);
 		fetch_pc <= next_fetch_pc;
 	end
 
-	assign instruction = mem_out;
 	assign pc_out = fetch_pc;
 
 endmodule
@@ -761,6 +775,7 @@ module decoder_uno(clk, instruction_in, pc_in, execute_op, arg_0, arg_1, pc_out,
 			5'b00000: begin
 				execute_op_reg = DO_ADD;
 				arg_0_reg = instruction[7:5];
+				arg_1_reg = USE_IMMEDIATE;
 				immediate_out_reg = $signed (instruction[4:0]);
 			end
 
@@ -775,6 +790,7 @@ module decoder_uno(clk, instruction_in, pc_in, execute_op, arg_0, arg_1, pc_out,
 			5'b00010: begin
 				execute_op_reg = DO_SUB;
 				arg_0_reg = instruction[7:5];
+				arg_1_reg = USE_IMMEDIATE;
 				immediate_out_reg = $signed (instruction[4:0]);
 			end
 
@@ -789,6 +805,7 @@ module decoder_uno(clk, instruction_in, pc_in, execute_op, arg_0, arg_1, pc_out,
 			5'b10100: begin
 				execute_op_reg = DO_LOAD;
 				arg_0_reg = instruction[7:5];
+				arg_1_reg = USE_IMMEDIATE;
 				immediate_out_reg = $signed (instruction[4:0]);
 			end
 			
@@ -796,6 +813,7 @@ module decoder_uno(clk, instruction_in, pc_in, execute_op, arg_0, arg_1, pc_out,
 			5'b10101: begin
 				execute_op_reg = DO_LOAD;
 				arg_0_reg = pc_in;
+				arg_1_reg = USE_IMMEDIATE;
 				immediate_out_reg = $signed (instruction[4:0]);
 			end
 			
@@ -803,6 +821,7 @@ module decoder_uno(clk, instruction_in, pc_in, execute_op, arg_0, arg_1, pc_out,
 			5'b10110: begin
 				execute_op_reg = DO_STORE;
 				arg_0_reg = instruction[7:5];
+				arg_1_reg = USE_IMMEDIATE;
 				immediate_out_reg = $signed (instruction[4:0]);
 			end
 			
@@ -810,6 +829,7 @@ module decoder_uno(clk, instruction_in, pc_in, execute_op, arg_0, arg_1, pc_out,
 			5'b10111: begin
 				execute_op_reg = DO_STORE;
 				arg_0_reg = pc_in;
+				arg_1_reg = USE_IMMEDIATE;
 				immediate_out_reg = $signed (instruction[4:0]);
 			end
 		endcase
@@ -849,7 +869,7 @@ endmodule
 
 module memoreer(clk, pc_in,	operand_0, operand_1,
 	operation, 	destination_in,	destination_out, 	mem_addr_out,
-	mem_wren, 	load_value,	store_value, result,	pc_out, done;);
+	mem_wren, 	load_value,	store_value, result,	pc_out, done);
 
 	parameter DO_LOAD= 3'h2;
 	parameter DO_STORE=3'h3;
@@ -861,10 +881,10 @@ module memoreer(clk, pc_in,	operand_0, operand_1,
 	input [15:0] operand_1;
 	input [3:0]  operation;
 	input [3:0]  destination_in;
-	input mem_wren;
+	output mem_wren;
 	input [15:0] load_value;
 	output [3:0] destination_out;
-	output [15:0] store_addr;
+	output [15:0] mem_addr_out;
 	output [15:0] store_value;
 	output [15:0] result;
 	output [15:0] pc_out;	
@@ -874,6 +894,7 @@ module memoreer(clk, pc_in,	operand_0, operand_1,
 	reg [15:0] mem_addr_out_reg;
 	reg [3:0] cycles_we_have_stalled;
 	reg start_stalin;
+	reg mem_wren_reg;
 
 	reg [15:0] result_save;
 	reg [15:0] pc_save;
@@ -882,15 +903,15 @@ module memoreer(clk, pc_in,	operand_0, operand_1,
 	reg [3:0]  operation_save;
 
 	always @(*) begin
+	mem_wren_reg = 0;
 		case(operation)
 			DO_LOAD: begin
 				mem_addr_out_reg = operand_0 + operand_1;
-				mem_wren = 0;
 				start_stalin = 1;
 			end
 			DO_STORE: begin
 				mem_addr_out_reg = operand_0 + operand_1;
-				mem_wren = 1;
+				mem_wren_reg = 1;
 				start_stalin = 1;
 			end
 		endcase
@@ -898,11 +919,11 @@ module memoreer(clk, pc_in,	operand_0, operand_1,
 	end
 
 	always @(posedge clk) begin
-		if (start_to_stall_reg == 1) begin
+		if (start_stalin == 1) begin
 			cycles_we_have_stalled <= 0;
 			pc_save <= pc_in;
 			operation_save <= operation;
-			destination_save <= destination;
+			destination_save <= destination_in;
 		end else begin
 			cycles_we_have_stalled <= cycles_we_have_stalled + 1;
 		end
@@ -916,8 +937,9 @@ module memoreer(clk, pc_in,	operand_0, operand_1,
 		end
 	end
 	assign mem_addr_out = mem_addr_out_reg;
-	assign destination_out <= destination_save;
-	assign done <= done_reg;
-	assign pc_out <= pc_save;
-	assign result <= result_save;
+	assign destination_out = destination_save;
+	assign done = done_reg;
+	assign pc_out = pc_save;
+	assign result = result_save;
+	assign mem_wren = mem_wren_reg;
 endmodule
