@@ -1,17 +1,21 @@
-WIDTH=16;
-DEPTH=9;
+Width=16;
+Depth=13;
 
 ADDRESS_RADIX=DEC;
 DATA_RADIX=HEX;
 
 CONTENT BEGIN
-0: 02e2;
-1: 0004;
-2: 1001;
-3: f801;
-4: eafd;
-5: 1a42;
-6: fffa;
-7: 0142;
-8: 0363;
+	0: 01e1;
+	1: 02e2;
+	2: ae07;
+	3: 03c1;
+	4: a560;
+	5: 00ed;
+	6: b802;
+	7: 0000;
+	8: 0000;
+	9: 0000;
+	10: 000a;
+	11: face;
+	12: ffff;
 END;
