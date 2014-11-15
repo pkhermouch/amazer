@@ -381,6 +381,12 @@ always @(posedge clk) begin
 			Source_Register_0_Ready[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
 		end else begin
 			Source_Register_0_Resource[resource_to_use] <= Register_Status[scorebored_source_0];
+			if (Register_Status[scorebored_source_0] != NO_RESOURCE) begin
+				Source_Register_0_Ready[resource_to_use] <= NOT_READY;
+			end else begin
+				Source_Register_0_Ready[resource_to_use] <= READY;
+			end 
+				
 		end
 
 		if (scorebored_source_1 == USE_PC) begin
@@ -393,6 +399,11 @@ always @(posedge clk) begin
 			Source_Register_1_Ready[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
 		end else begin
 			Source_Register_1_Resource[resource_to_use] <= Register_Status[scorebored_source_1];
+			if (Register_Status[scorebored_source_1] != NO_RESOURCE) begin
+				Source_Register_1_Ready[resource_to_use] <= NOT_READY;
+			end else begin
+				Source_Register_1_Ready[resource_to_use] <= READY;
+			end 
 		end
 		
 		Register_Status[scorebored_dest] <= resource_to_use;
@@ -484,8 +495,10 @@ display(debug[3:0], HEX0);
 always @(*) begin
 	// MATHER_0 debug
 	if (SW[7]) begin
-		if (SW[3]) begin
+		if (SW[4]) begin
 			debug = mather_0_result;
+		end else if (SW[3]) begin
+			debug = {1'b0, Source_Register_0_Resource[MATHER_0], 1'b0, Source_Register_0_Ready[MATHER_0], 1'b0, Source_Register_1_Resource[MATHER_0], 1'b0, Source_Register_1_Ready[MATHER_0]};
 		end else if (SW[2]) begin
 			debug = {1'b0, Busy[MATHER_0], 1'b0, Dest_Register[MATHER_0], Source_Register_0[MATHER_0], Source_Register_1[MATHER_0]};
 		end else if (SW[1]) begin
@@ -497,8 +510,10 @@ always @(*) begin
 		end
 	// MATHER_1 debug
 	end else if (SW[6]) begin
-		if (SW[3]) begin
+		if (SW[4]) begin
 			debug = mather_1_result;
+		end else if (SW[3]) begin
+			debug = {1'b0, Source_Register_0_Resource[MATHER_1], 1'b0, Source_Register_0_Ready[MATHER_1], 1'b0, Source_Register_1_Resource[MATHER_1], 1'b0, Source_Register_1_Ready[MATHER_1]};
 		end else if (SW[2]) begin
 			debug = {1'b0, Busy[MATHER_1], 1'b0, Dest_Register[MATHER_1], Source_Register_0[MATHER_1], Source_Register_1[MATHER_1]};
 		end else if (SW[1]) begin
@@ -510,8 +525,10 @@ always @(*) begin
 		end
 	// MEMOREER_0 debug
 	end else if (SW[5]) begin
-		if (SW[3]) begin
+		if (SW[4]) begin
 			debug = memoreer_0_result;
+		end else if (SW[3]) begin
+			debug = {1'b0, Source_Register_0_Resource[MEMOREER_0], 1'b0, Source_Register_0_Ready[MEMOREER_0], 1'b0, Source_Register_1_Resource[MEMOREER_0], 1'b0, Source_Register_1_Ready[MEMOREER_0]};
 		end else if (SW[2]) begin
 			debug = {1'b0, Busy[MEMOREER_0], 1'b0, Dest_Register[MEMOREER_0], Source_Register_0[MEMOREER_0], Source_Register_1[MEMOREER_0]};
 		end else if (SW[1]) begin
@@ -735,24 +752,34 @@ module mather (clk, pc_in, operand_0, operand_1, operation, destination_in, dest
 	output [15:0] result;
 	output [15:0] pc_out;
 
+	
+	reg [15:0] operand_0_reg;
+	reg [15:0] operand_1_reg;
+	reg [15:0] operation_reg;
+	reg [2:0]  destination_in_reg;
+	
 	reg [15:0] result_reg;
 	reg [15:0] result_latch;
 	reg [2:0] dest_latch;
 	reg [15:0] pc_latch;
 
 	always @(*)
-		case (operation)
-			DO_ADD: result_reg = operand_0 + operand_1;
-			DO_SUB: result_reg = operand_0 - operand_1;
+		case (operation_reg)
+			DO_ADD: result_reg = operand_0_reg + operand_1_reg;
+			DO_SUB: result_reg = operand_0_reg - operand_1_reg;
 		endcase
 
 	always @(posedge clk) begin
 		result_latch <= result_reg;
-		if (operation == DO_NOP) begin
+		if (operation_reg == DO_NOP) begin
 			dest_latch <= 3'h7;
 		end else begin
-			dest_latch <= destination_in;
+			dest_latch <= destination_in_reg;
 		end
+		operand_0_reg <= operand_0;
+		operand_1_reg <= operand_1;
+		operation_reg <= operation;
+		destination_in_reg <= destination_in;
 		pc_latch <= pc_in;
 	end
 
