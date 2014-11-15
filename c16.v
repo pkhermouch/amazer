@@ -58,7 +58,7 @@ reg [15:0] mather_0_pc_in;
 reg [15:0] mather_0_operand_0;
 reg [15:0] mather_0_operand_1;
 reg [2:0] mather_0_operation;
-reg [2:0] mather_0_dest_in; // E 
+wire [2:0] mather_0_dest_in; // E 
 wire [2:0] mather_0_dest_out;
 wire [15:0] mather_0_result;
 wire [15:0] mather_0_pc_out;
@@ -67,7 +67,7 @@ reg [15:0] mather_1_pc_in;
 reg [15:0] mather_1_operand_0;
 reg [15:0] mather_1_operand_1;
 reg [2:0] mather_1_operation;
-reg [2:0] mather_1_dest_in; // E 
+wire [2:0] mather_1_dest_in; // E 
 wire [2:0] mather_1_dest_out;
 wire [15:0] mather_1_result;
 wire [15:0] mather_1_pc_out;
@@ -251,6 +251,10 @@ initial begin
 	Busy[0] = NOT_BUSY;
 	Busy[1] = NOT_BUSY;
 	Busy[2] = NOT_BUSY;
+	
+	FU_Operations[0] = DO_NOP;
+	FU_Operations[1] = DO_NOP;
+	FU_Operations[2] = DO_NOP;
 
 	Instruction_Status[0] = IN_INITIAL_STATE;
 	Instruction_Status[1] = IN_INITIAL_STATE;
@@ -300,16 +304,18 @@ always @(*) begin
 			// both sources are ready. send data to functional unit
 			if (Source_Register_0_Ready[MATHER_0] == READY) begin
 				reg_addr_0 = Source_Register_0[MATHER_0][2:0];
-				Operand_Values_0[MATHER_0] = reg_value_0;
+				mather_0_operand_0 = reg_value_0;
 			end else if(Source_Register_0_Ready[MATHER_0] == ACTUALLY_IMMEDIATE_VALUE) begin
 				//n nothing, because immediate value are by default placed in Operand_Values_0/1
+				mather_0_operand_0 = Operand_Values_0[MATHER_0];
 			end
 
 			if (Source_Register_1_Ready[MATHER_0] == READY) begin
 				reg_addr_1 = Source_Register_1[MATHER_0][2:0];
-				Operand_Values_1[MATHER_0] = reg_value_1;
+				mather_0_operand_1 = reg_value_1;
 			end else if(Source_Register_1_Ready[MATHER_0] == ACTUALLY_IMMEDIATE_VALUE) begin
 				//n nothing, because immediate value are by default placed in Operand_Values_0/1
+				mather_0_operand_1 = Operand_Values_1[MATHER_0];
 			end
 
 		end
@@ -322,16 +328,18 @@ always @(*) begin
 			// both sources are ready. send data to functional unit
 			if (Source_Register_0_Ready[MATHER_1] == READY) begin
 				reg_addr_2 = Source_Register_0[MATHER_1][2:0];
-				Operand_Values_0[MATHER_1] = reg_value_2;
+				mather_1_operand_0 = reg_value_2;
 			end else if(Source_Register_0_Ready[MATHER_1] == ACTUALLY_IMMEDIATE_VALUE) begin
 				//n nothing, because immediate value are by default placed in Operand_Values_0/1
+				mather_1_operand_0 = Operand_Values_0[MATHER_1];
 			end
 
 			if (Source_Register_1_Ready[MATHER_1] == READY) begin
 				reg_addr_3 = Source_Register_1[MATHER_1][2:0];
-				Operand_Values_1[MATHER_1] = reg_value_3;
+				mather_1_operand_1 = reg_value_3;
 			end else if(Source_Register_1_Ready[MATHER_1] == ACTUALLY_IMMEDIATE_VALUE) begin
 				//n nothing, because immediate value are by default placed in Operand_Values_0/1
+				mather_1_operand_1 = Operand_Values_1[MATHER_1];
 			end
 
 		end
@@ -344,9 +352,10 @@ always @(*) begin
 			// both sources are ready. send data to functional unit
 			if (Source_Register_0_Ready[MEMOREER_0] == READY) begin
 				reg_addr_4 = Source_Register_0[MEMOREER_0][2:0];
-				Operand_Values_0[MEMOREER_0] = reg_value_4;
+				memoreer_0_operand_0 = reg_value_4;
 			end else if(Source_Register_0_Ready[MEMOREER_0] == ACTUALLY_IMMEDIATE_VALUE) begin
 				//n nothing, because immediate value are by default placed in Operand_Values_0/1
+				memoreer_0_operand_0 = Operand_Values_0[MEMOREER_0];
 			end
 
 		end
@@ -355,34 +364,56 @@ always @(*) begin
 end
 
 always @(posedge clk) begin
+	// This is where we issue things
 	if (resource_to_use != NO_RESOURCE) begin
 		Busy[resource_to_use] <= BUSY;
 		Dest_Register[resource_to_use] <= scorebored_dest;
 		Source_Register_0[resource_to_use] <= scorebored_source_0;
 		Source_Register_1[resource_to_use] <= scorebored_source_1;
-
+		FU_Operations[resource_to_use] <= scorebored_op;
 		if (scorebored_source_0 == USE_PC) begin
 			Operand_Values_0[resource_to_use] <= scorebored_pc;
-			Source_Register_0_Resource[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
+			Source_Register_0_Resource[resource_to_use] <= NO_RESOURCE;
+			Source_Register_0_Ready[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
 		end else if (scorebored_source_0 == USE_IMMEDIATE) begin
 			Operand_Values_0[resource_to_use] <= immediate_out;
-			Source_Register_0_Resource[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
+			Source_Register_0_Resource[resource_to_use] <= NO_RESOURCE;
+			Source_Register_0_Ready[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
 		end else begin
 			Source_Register_0_Resource[resource_to_use] <= Register_Status[scorebored_source_0];
 		end
 
 		if (scorebored_source_1 == USE_PC) begin
 			Operand_Values_1[resource_to_use] <= scorebored_pc;
-			Source_Register_1_Resource[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
+			Source_Register_1_Resource[resource_to_use] <= NO_RESOURCE;
+			Source_Register_1_Ready[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
 		end else if (scorebored_source_1 == USE_IMMEDIATE) begin
 			Operand_Values_1[resource_to_use] <= immediate_out;
-			Source_Register_1_Resource[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
+			Source_Register_1_Resource[resource_to_use] <= NO_RESOURCE;
+			Source_Register_1_Ready[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
 		end else begin
 			Source_Register_1_Resource[resource_to_use] <= Register_Status[scorebored_source_1];
 		end
 		
 		Register_Status[scorebored_dest] <= resource_to_use;
 	end
+	
+	// This is where we dispatch things
+	
+	if (mather_0_operation != DO_NOP) begin
+		Busy[MATHER_0] = BUSY_AND_WORKING;
+	end
+	
+	if (mather_1_operation != DO_NOP) begin
+		Busy[MATHER_1] = BUSY_AND_WORKING;
+	end
+	
+	if (memoreer_0_operation != DO_NOP) begin
+		Busy[MEMOREER_0] = BUSY_AND_WORKING;
+	end
+	
+	
+	// This is where the done things are
 
 	if (mather_0_dest_out != 7) begin
 		Register_Status[mather_0_dest_out] <= NO_RESOURCE;
@@ -412,8 +443,6 @@ always @(posedge clk) begin
 		Busy[MATHER_1] <= NOT_BUSY;
 	end
 
-	
-
 	if(memoreer_0_done == 1) begin
 		Busy[MEMOREER_0] <= NOT_BUSY;
 		if (memoreer_0_dest_out != 7) begin
@@ -434,6 +463,10 @@ end
 	
 assign should_fetch_stall = should_fetch_stall_reg;
 
+assign mather_0_dest_in = Dest_Register[MATHER_0];
+
+assign mather_1_dest_in = Dest_Register[MATHER_1];
+
 ///////////////////
 // debug support //
 ///////////////////
@@ -449,35 +482,44 @@ display(debug[3:0], HEX0);
 
 // what do we display
 always @(*) begin
+	// MATHER_0 debug
 	if (SW[7]) begin
-		if (SW[2]) begin
+		if (SW[3]) begin
+			debug = mather_0_result;
+		end else if (SW[2]) begin
 			debug = {1'b0, Busy[MATHER_0], 1'b0, Dest_Register[MATHER_0], Source_Register_0[MATHER_0], Source_Register_1[MATHER_0]};
 		end else if (SW[1]) begin
 			debug = mather_0_operand_1;
 		end else if (SW[0]) begin
 			debug = mather_0_operand_0;
 		end else begin
-			debug = {5'h0, mather_0_operation, 5'h0, mather_0_dest_in};
+			debug = {5'h0, mather_0_operation, 1'h0, mather_0_dest_out, 1'h0, mather_0_dest_in};
 		end
+	// MATHER_1 debug
 	end else if (SW[6]) begin
-		if (SW[2]) begin
+		if (SW[3]) begin
+			debug = mather_1_result;
+		end else if (SW[2]) begin
 			debug = {1'b0, Busy[MATHER_1], 1'b0, Dest_Register[MATHER_1], Source_Register_0[MATHER_1], Source_Register_1[MATHER_1]};
 		end else if (SW[1]) begin
 			debug = mather_1_operand_1;
 		end else if (SW[0]) begin
 			debug = mather_1_operand_0;
 		end else begin
-			debug = {5'h0, mather_1_operation, 5'h0, mather_1_dest_in};
+			debug = {5'h0, mather_1_operation, 1'h0, mather_1_dest_out, 1'h0, mather_1_dest_in};
 		end
+	// MEMOREER_0 debug
 	end else if (SW[5]) begin
-		if (SW[2]) begin
+		if (SW[3]) begin
+			debug = memoreer_0_result;
+		end else if (SW[2]) begin
 			debug = {1'b0, Busy[MEMOREER_0], 1'b0, Dest_Register[MEMOREER_0], Source_Register_0[MEMOREER_0], Source_Register_1[MEMOREER_0]};
 		end else if (SW[1]) begin
 			debug = memoreer_0_operand_1;
 		end else if (SW[0]) begin
 			debug = memoreer_0_operand_0;
 		end else begin
-			debug = {5'h0, memoreer_0_operation, 5'h0, memoreer_0_dest_in};
+			debug = {5'h0, memoreer_0_operation, 1'h0, memoreer_0_dest_out, 1'h0, memoreer_0_dest_in};
 		end
 	end else if (SW[4]) begin
 		if (SW[3]) begin
