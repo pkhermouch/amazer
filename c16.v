@@ -46,12 +46,14 @@ wire[15:0] reg_value_1;
 wire[15:0] reg_value_2;
 wire[15:0] reg_value_3;
 wire[15:0] reg_value_4;
+wire[15:0] reg_value_5;
 wire[15:0] reg_dbg;
 
 reg[2:0] reg_addr_0;
 reg[2:0] reg_addr_1;
 reg[2:0] reg_addr_2;
 reg[2:0] reg_addr_3;
+reg[2:0] reg_addr_5;
 reg[2:0] reg_addr_4;
 
 reg [15:0] mather_0_pc_in;
@@ -76,7 +78,7 @@ reg [15:0] memoreer_0_pc_in;
 reg [15:0] memoreer_0_operand_0;
 reg [15:0] memoreer_0_operand_1;
 reg [2:0] memoreer_0_operation;
-reg [2:0] memoreer_0_dest_in; // E 
+wire [2:0] memoreer_0_dest_in; // E 
 wire [2:0] memoreer_0_dest_out;
 wire [15:0] memoreer_0_result;
 wire [15:0] memoreer_0_pc_out;
@@ -88,6 +90,7 @@ registers(
 	.read_addr_2(reg_addr_2),
 	.read_addr_3(reg_addr_3),
 	.read_addr_4(reg_addr_4),
+	.read_addr_5(reg_addr_5),
 	.read_addr_dbg(SW[2:0]),
 	.write_addr_0(mather_0_dest_out),
 	.write_value_0(mather_0_result),
@@ -100,6 +103,7 @@ registers(
 	.read_value_2(reg_value_2),
 	.read_value_3(reg_value_3),
 	.read_value_4(reg_value_4),
+	.read_value_5(reg_value_5),
 	.read_value_dbg(reg_dbg)
 	);
 
@@ -174,12 +178,13 @@ mather(
 	.result(mather_1_result),
 	.pc_out(mather_1_pc_out)
 	);
-
+reg [15:0] memoreer_0_operand_2;
 memoreer(
 	.clk(clk),
 	.pc_in(memoreer_0_pc_in),
 	.operand_0(memoreer_0_operand_0),
 	.operand_1(memoreer_0_operand_1),
+	.operand_2(memoreer_0_operand_2),
 	.operation(memoreer_0_operation),
 	.destination_in(memoreer_0_dest_in), // E 
 	.destination_out(memoreer_0_dest_out),
@@ -357,7 +362,11 @@ always @(*) begin
 				//n nothing, because immediate value are by default placed in Operand_Values_0/1
 				memoreer_0_operand_0 = Operand_Values_0[MEMOREER_0];
 			end
-
+			if (Source_Register_1_Ready[MEMOREER_0] == READY) begin
+				reg_addr_5 = Source_Register_1[MEMOREER_0][2:0];
+				memoreer_0_operand_2 = reg_value_5;
+			end
+			memoreer_0_operand_1 = Operand_Values_1[MEMOREER_0];
 		end
 	end
 
@@ -366,13 +375,14 @@ end
 always @(posedge clk) begin
 	// This is where we issue things
 	if (resource_to_use != NO_RESOURCE) begin
+		Register_Status[scorebored_dest] <= resource_to_use;
 		Busy[resource_to_use] <= BUSY;
 		Dest_Register[resource_to_use] <= scorebored_dest;
 		Source_Register_0[resource_to_use] <= scorebored_source_0;
 		Source_Register_1[resource_to_use] <= scorebored_source_1;
 		FU_Operations[resource_to_use] <= scorebored_op;
 		if (scorebored_source_0 == USE_PC) begin
-			Operand_Values_0[resource_to_use] <= scorebored_pc;
+			Operand_Values_0[resource_to_use] <= scorebored_pc + 16'h1;
 			Source_Register_0_Resource[resource_to_use] <= NO_RESOURCE;
 			Source_Register_0_Ready[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
 		end else if (scorebored_source_0 == USE_IMMEDIATE) begin
@@ -388,9 +398,24 @@ always @(posedge clk) begin
 			end 
 				
 		end
-
+		if (scorebored_op == DO_STORE) begin
+		   if (scorebored_source_1 == USE_PC) begin
+				Operand_Values_1[resource_to_use] <= scorebored_pc + 16'h1;
+			end else begin
+				Operand_Values_1[resource_to_use] <= immediate_out;
+					end
+					   // end else
+							Source_Register_1[resource_to_use] <= {1'h0, scorebored_dest};
+			Source_Register_1_Resource[resource_to_use] <= Register_Status[scorebored_dest];
+			if (Register_Status[scorebored_dest] != NO_RESOURCE) begin
+				Source_Register_1_Ready[resource_to_use] <= NOT_READY;
+			end else begin
+				Source_Register_1_Ready[resource_to_use] <= READY;
+			end
+			Register_Status[scorebored_dest] <= NO_RESOURCE;
+		end else
 		if (scorebored_source_1 == USE_PC) begin
-			Operand_Values_1[resource_to_use] <= scorebored_pc;
+			Operand_Values_1[resource_to_use] <= scorebored_pc + 16'h1;
 			Source_Register_1_Resource[resource_to_use] <= NO_RESOURCE;
 			Source_Register_1_Ready[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
 		end else if (scorebored_source_1 == USE_IMMEDIATE) begin
@@ -406,21 +431,20 @@ always @(posedge clk) begin
 			end 
 		end
 		
-		Register_Status[scorebored_dest] <= resource_to_use;
 	end
 	
 	// This is where we dispatch things
 	
 	if (mather_0_operation != DO_NOP) begin
-		Busy[MATHER_0] = BUSY_AND_WORKING;
+		Busy[MATHER_0] <= BUSY_AND_WORKING;
 	end
 	
 	if (mather_1_operation != DO_NOP) begin
-		Busy[MATHER_1] = BUSY_AND_WORKING;
+		Busy[MATHER_1] <= BUSY_AND_WORKING;
 	end
 	
 	if (memoreer_0_operation != DO_NOP) begin
-		Busy[MEMOREER_0] = BUSY_AND_WORKING;
+		Busy[MEMOREER_0] <= BUSY_AND_WORKING;
 	end
 	
 	
@@ -475,8 +499,8 @@ end
 assign should_fetch_stall = should_fetch_stall_reg;
 
 assign mather_0_dest_in = Dest_Register[MATHER_0];
-
 assign mather_1_dest_in = Dest_Register[MATHER_1];
+assign memoreer_0_dest_in = Dest_Register[MEMOREER_0];
 
 ///////////////////
 // debug support //
@@ -484,7 +508,7 @@ assign mather_1_dest_in = Dest_Register[MATHER_1];
 reg [15:0]debug;
 
 assign LEDR = fetch_pc[9:0];
-assign LEDG = {should_fetch_stall, 7'h0};
+assign LEDG = {should_fetch_stall, memoreer_0_done, memory_wren, 5'h0};
 
 display(debug[15:12], HEX3);
 display(debug[11:8], HEX2);
@@ -493,8 +517,16 @@ display(debug[3:0], HEX0);
 
 // what do we display
 always @(*) begin
+	if (SW[8]) begin
+		if (SW[1]) begin
+			debug = memory_value_in;
+		end else if (SW[0]) begin
+			debug = memory_value_out;
+		end else begin
+			debug = memoreer_addr;
+		end
 	// MATHER_0 debug
-	if (SW[7]) begin
+	end else if (SW[7]) begin
 		if (SW[4]) begin
 			debug = mather_0_result;
 		end else if (SW[3]) begin
@@ -526,7 +558,10 @@ always @(*) begin
 	// MEMOREER_0 debug
 	end else if (SW[5]) begin
 		if (SW[4]) begin
-			debug = memoreer_0_result;
+			if (SW[3]) begin
+				debug = memoreer_0_operand_2;
+				end else begin
+			debug = memoreer_0_result; end
 		end else if (SW[3]) begin
 			debug = {1'b0, Source_Register_0_Resource[MEMOREER_0], 1'b0, Source_Register_0_Ready[MEMOREER_0], 1'b0, Source_Register_1_Resource[MEMOREER_0], 1'b0, Source_Register_1_Ready[MEMOREER_0]};
 		end else if (SW[2]) begin
@@ -536,7 +571,7 @@ always @(*) begin
 		end else if (SW[0]) begin
 			debug = memoreer_0_operand_0;
 		end else begin
-			debug = {5'h0, memoreer_0_operation, 1'h0, memoreer_0_dest_out, 1'h0, memoreer_0_dest_in};
+			debug = {3'h0, memoreer_0_done, 1'h0, memoreer_0_operation, 1'h0, memoreer_0_dest_out, 1'h0, memoreer_0_dest_in};
 		end
 	end else if (SW[4]) begin
 		if (SW[3]) begin
@@ -545,10 +580,12 @@ always @(*) begin
 			debug = {1'b0, scorebored_op, scorebored_source_0, scorebored_source_1, 1'b0, scorebored_dest};
 		end
    end else if (SW[3]) begin
-		if (SW[0]) begin
-			debug = instruction_addr;
+		if (SW[2]) begin
+			debug = immediate_out;
 		end else if (SW[1]) begin
 			debug = {5'h0, resource_to_use, 5'h0, scorebored_op};
+		end else if (SW[0]) begin
+			debug = instruction_addr;
 		end else begin
 			debug = instruction;
 		end
@@ -565,8 +602,8 @@ endmodule
 /////////////////////////
 module registers(
 		clk, read_addr_dbg, read_value_dbg,
-		read_addr_0, read_addr_1, read_addr_2, read_addr_3, read_addr_4,  
-		read_value_0, read_value_1, read_value_2, read_value_3, read_value_4,
+		read_addr_0, read_addr_1, read_addr_2, read_addr_3, read_addr_4,  read_addr_5,
+		read_value_0, read_value_1, read_value_2, read_value_3, read_value_4,read_value_5    ,
 		write_addr_0, write_addr_1, write_addr_2, 
 		write_value_0, write_value_1, write_value_2 
 		);
@@ -580,6 +617,7 @@ module registers(
 	input[2:0] read_addr_2;
 	input[2:0] read_addr_3;
 	input[2:0] read_addr_4;
+	input[2:0] read_addr_5;
 	input[2:0] write_addr_0;
 	input[2:0] write_addr_1;
 	input[2:0] write_addr_2;
@@ -593,22 +631,24 @@ module registers(
 	output[15:0] read_value_2;
 	output[15:0] read_value_3;
 	output[15:0] read_value_4;
+	output[15:0] read_value_5;
 
 	reg[15:0] rv0;
 	reg[15:0] rv1;
 	reg[15:0] rv2;
 	reg[15:0] rv3;
 	reg[15:0] rv4;
+	reg[15:0] rv5;
 	reg[15:0] rvdbg;
 
 	// How do I for loop?
 	reg [3:0] i;
 	reg [3:0] j;
 
-	wire[15:0] all_read_addrs[5:0];
+	wire[15:0] all_read_addrs[6:0];
 	wire[15:0] all_write_addrs[2:0];
 	wire[15:0] all_write_values[2:0];
-	reg[15:0] all_rv[5:0];
+	reg[15:0] all_rv[6:0];
 
 	reg [15:0]regs[7:0];
 	
@@ -617,7 +657,8 @@ module registers(
 	assign all_read_addrs[2] = read_addr_2;
 	assign all_read_addrs[3] = read_addr_3;
 	assign all_read_addrs[4] = read_addr_4;
-	assign all_read_addrs[5] = read_addr_dbg;
+	assign all_read_addrs[5] = read_addr_5;
+	assign all_read_addrs[6] = read_addr_dbg;
 	
 	assign all_write_addrs[0] = write_addr_0;
 	assign all_write_addrs[1] = write_addr_1;
@@ -638,7 +679,7 @@ module registers(
 	end
 
 	always @(*) begin
-		for(i = 0; i < 6; i = i + 1) begin
+		for(i = 0; i < 7; i = i + 1) begin
 			all_rv[i] = regs[all_read_addrs[i]];
 			for(j = 0; j < 3; j = j + 1) begin
 				if(all_write_addrs[j] != 7 && all_read_addrs[i] == all_write_addrs[j]) begin
@@ -661,7 +702,8 @@ module registers(
 	assign read_value_2 = all_rv[2];
 	assign read_value_3 = all_rv[3];
 	assign read_value_4 = all_rv[4];
-	assign read_value_dbg = all_rv[5];
+	assign read_value_5 = all_rv[5];
+	assign read_value_dbg = all_rv[6];
 
 endmodule
 
@@ -815,8 +857,10 @@ module decoder_uno(clk, instruction_in, pc_in, execute_op, arg_0, arg_1, pc_out,
 	reg [2:0] execute_op_reg;
 	reg [3:0] arg_0_reg;
 	reg [3:0] arg_1_reg;
+	reg [15:0] pc_store_place_for_stalling_reg;
 	reg [15:0] immediate_out_reg;
 	reg [2:0] dest_reg;
+	reg [15:0] pc_out_reg;
 
 	reg [15:0] stupid_save_thingy_for_instruction;
 	reg there_is_something_in_stupid_save_thingy_for_instruction;
@@ -826,7 +870,7 @@ module decoder_uno(clk, instruction_in, pc_in, execute_op, arg_0, arg_1, pc_out,
 	always @(*) begin
 
 		instruction = there_is_something_in_stupid_save_thingy_for_instruction == 1 ? stupid_save_thingy_for_instruction : instruction_in;
-
+		pc_out_reg = there_is_something_in_stupid_save_thingy_for_instruction == 1 ? pc_store_place_for_stalling_reg : pc_in;
 		execute_op_reg = DO_NOP;
 		arg_0_reg = 4'hb;
 		arg_1_reg = 4'hb;
@@ -877,7 +921,7 @@ module decoder_uno(clk, instruction_in, pc_in, execute_op, arg_0, arg_1, pc_out,
 				execute_op_reg = DO_LOAD;
 				arg_0_reg = USE_PC;
 				arg_1_reg = USE_IMMEDIATE;
-				immediate_out_reg = $signed (instruction[4:0]);
+				immediate_out_reg = $signed (instruction[7:0]);
 			end
 			
 			// st, f = 0
@@ -893,7 +937,7 @@ module decoder_uno(clk, instruction_in, pc_in, execute_op, arg_0, arg_1, pc_out,
 				execute_op_reg = DO_STORE;
 				arg_0_reg = USE_PC;
 				arg_1_reg = USE_IMMEDIATE;
-				immediate_out_reg = $signed (instruction[4:0]);
+				immediate_out_reg = $signed (instruction[7:0]);
 			end
 		endcase
 		/* Possibly loop
@@ -916,13 +960,14 @@ module decoder_uno(clk, instruction_in, pc_in, execute_op, arg_0, arg_1, pc_out,
 			end else begin
 				there_is_something_in_stupid_save_thingy_for_instruction <= 1;
 				stupid_save_thingy_for_instruction <= instruction;
+				pc_store_place_for_stalling_reg <= pc_in;
 			end
 		end else begin
 			there_is_something_in_stupid_save_thingy_for_instruction <= 0;
 		end
 	end
 
-	assign pc_out = pc_in;
+	assign pc_out = pc_out_reg;
 	assign execute_op = execute_op_reg;
 	assign arg_0 = arg_0_reg;
 	assign arg_1 = arg_1_reg;
@@ -933,7 +978,7 @@ endmodule
 
 
 module memoreer(clk, pc_in,	operand_0, operand_1,
-	operation, 	destination_in,	destination_out, 	mem_addr_out,
+	operation, 	destination_in,	destination_out, 	mem_addr_out, operand_2,
 	mem_wren, 	load_value,	store_value, result,	pc_out, done);
 
 	parameter DO_LOAD= 3'h2;
@@ -944,38 +989,53 @@ module memoreer(clk, pc_in,	operand_0, operand_1,
 	input [15:0] pc_in;
 	input [15:0] operand_0;
 	input [15:0] operand_1;
+	input [15:0] operand_2;
 	input [3:0]  operation;
 	input [3:0]  destination_in;
-	output mem_wren;
 	input [15:0] load_value;
 	output [3:0] destination_out;
 	output [15:0] mem_addr_out;
 	output [15:0] store_value;
 	output [15:0] result;
 	output [15:0] pc_out;	
+	output mem_wren;
 
 	output done;
 
+	reg [15:0] pc_in_reg;
+	reg [15:0] operand_0_reg;
+	reg [15:0] operand_1_reg;
+	reg [15:0] operand_2_reg;
+	reg [3:0]  operation_reg;
+	reg [3:0]  destination_in_reg;
+	
 	reg [15:0] mem_addr_out_reg;
-	reg [3:0] cycles_we_have_stalled;
+	reg [31:0] cycles_we_have_stalled;
 	reg start_stalin;
 	reg mem_wren_reg;
+	reg [15:0] store_value_reg;
 
 	reg [15:0] result_save;
 	reg [15:0] pc_save;
 	reg [2:0]  destination_save;
 	reg done_reg;
 	reg [3:0]  operation_save;
+	
+	initial begin
+		done_reg = 0;
+		cycles_we_have_stalled = 72;
+	end
 
 	always @(*) begin
 		mem_wren_reg = 0;
-		case(operation)
+		start_stalin = 0;
+		case(operation_reg)
 			DO_LOAD: begin
-				mem_addr_out_reg = operand_0 + operand_1;
+				mem_addr_out_reg = operand_0_reg + operand_1_reg;
 				start_stalin = 1;
 			end
 			DO_STORE: begin
-				mem_addr_out_reg = operand_0 + operand_1;
+				mem_addr_out_reg = operand_0_reg + operand_1_reg;
 				mem_wren_reg = 1;
 				start_stalin = 1;
 			end
@@ -987,24 +1047,35 @@ module memoreer(clk, pc_in,	operand_0, operand_1,
 		if (start_stalin == 1) begin
 			cycles_we_have_stalled <= 0;
 			pc_save <= pc_in;
-			operation_save <= operation;
+			operation_save <= operation_reg;
 			destination_save <= destination_in;
 		end else begin
 			cycles_we_have_stalled <= cycles_we_have_stalled + 1;
 		end
-		if(cycles_we_have_stalled == 3) begin
+		if(cycles_we_have_stalled == 2) begin
 			done_reg <= 1;
 			if (operation_save == DO_LOAD) begin
 				result_save <= load_value;
+			end else begin
+				destination_save <= 7;
 			end
 		end else begin
 			done_reg <= 0;
 		end
+		pc_in_reg <= pc_in;
+		operand_0_reg <= operand_0;
+		operand_1_reg <= operand_1;
+		operand_2_reg <= operand_2;
+		store_value_reg <= operand_2;
+		operation_reg <= operation;
+		destination_in_reg <= destination_in;
 	end
+	
 	assign mem_addr_out = mem_addr_out_reg;
 	assign destination_out = destination_save;
 	assign done = done_reg;
 	assign pc_out = pc_save;
 	assign result = result_save;
 	assign mem_wren = mem_wren_reg;
+	assign store_value = store_value_reg;
 endmodule
