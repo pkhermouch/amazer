@@ -1,28 +1,19 @@
-Due date: Friday 11/14/2014 @11:59pm
+Due date: Wednesday 11/26/2014 @11:59pm
 
-Assignment:  Implement a a scoreboard in the style of the the CDC6600
-for a subset of our C16 instructions
+Assignment:  Implement an out of order c16.
 
-Stages:
+Rules:
 
-    - Fetch
-    - D1 : decode, issue, WAW stalls, structural hazards
-    - D2 : read operands, RAW hazards
-    - X (depends on the functional unit)
-    - WB, WAR hazards
+    - you don't have to implement branches
+    - you must have load, add, and subtract instructions. Everything else
+      is optional
+    - instructions can run out of order but must commit in order
+    - you must implement some form of register renaming
+    - your display must show that instructions are running out of order
+    - be inventive and creative and have fun.
 
-Instruction subset:
+Deliverables:
 
-    - Integer add / subtract
-    - memory load / store
-    - no branches
-
-Functional units:
-
-    - be creative
-    - simplify your memory design and take as many cycles as you need to compute the effective
-      address and load from memory
-
-The CDC 6600 scoreboard is described starting at page 125 in Thornton's excellent book
-
-http://bitsavers.trailing-edge.com/pdf/cdc/cyber/books/DesignOfAComputer_CDC6600.pdf
+    - working code
+    - please share test cases with class
+    - a description of your design in REPORT
