@@ -83,7 +83,34 @@ wire [2:0] memoreer_0_dest_out;
 wire [15:0] memoreer_0_result;
 wire [15:0] memoreer_0_pc_out;
 
-registers(
+wire [3:0] writeout_register;
+wire [15:0] writeout_value;
+
+registers committed(
+	.clk(clk),
+	.read_addr_0(0),
+	.read_addr_1(0),
+	.read_addr_2(0),
+	.read_addr_3(0),
+	.read_addr_4(0),
+	.read_addr_5(0),
+	.read_addr_dbg(SW[2:0]),
+	.write_addr_0(writeout_register),
+	.write_value_0(writeout_value),
+	.write_addr_1(7),
+	.write_value_1(0),
+	.write_addr_2(7),
+	.write_value_2(0),
+	.read_value_0(0),
+	.read_value_1(0),
+	.read_value_2(0),
+	.read_value_3(0),
+	.read_value_4(0),
+	.read_value_5(0),
+	.read_value_dbg(reg_dbg)
+	);
+
+registers inflight(
 	.clk(clk),
 	.read_addr_0(reg_addr_0),
 	.read_addr_1(reg_addr_1),
@@ -195,6 +222,20 @@ memoreer(
 	.result(memoreer_0_result),
 	.pc_out(memoreer_0_pc_out),
 	.done(memoreer_0_done)
+	);
+
+reorder_buffer( .clk(clk), 
+	.mather_0_pc(mather_0_pc_out), 
+	.mather_0_register(mather_0_dest_out), 
+	.mather_0_value(mather_0_result), 
+	.mather_1_pc(mather_1_pc_out), 
+	.mather_1_register(mather_1_dest_out), 
+	.mather_1_value,(mather_1_result) 
+	.memoreer_0_pc(memoreer_0_pc_out), 
+	.memoreer_0_register(memoreer_0_dest_out), 
+	.memoreer_0_value(memoreer_0_result), 
+	.writeout_register(writeout_register), 
+	.writeout_value(writeout_value)
 	);
 	
 // Begin scoreb0r3d modulez
@@ -1079,3 +1120,216 @@ module memoreer(clk, pc_in,	operand_0, operand_1,
 	assign mem_wren = mem_wren_reg;
 	assign store_value = store_value_reg;
 endmodule
+
+
+
+module reorder_buffer(clk, 
+mather_0_pc, mather_0_register, mather_0_value, 
+mather_1_pc, mather_1_register, mather_1_value, 
+memoreer_0_pc, memoreer_0_register, memoreer_0_value, 
+writeout_register, writeout_value)
+
+input clk;
+
+input [15:0] mather_0_pc;
+input [3:0] mather_0_register;
+input [15:0] mather_0_value;
+
+input [15:0] mather_1_pc;
+input [3:0] mather_1_register;
+input [15:0] mather_1_value;
+
+input [15:0] memoreer_0_pc;
+input [3:0] memoreer_0_register;
+input [15:0] memoreer_0_value;
+
+output [3:0] writeout_register; 
+output [15:0] writeout_value;
+
+reg [3:0] writeout_register_reg;
+reg [15:0] writeout_value_reg;
+
+reg [15:0] current_reorder_pc;
+reg [15:0] reorder_values [15:0];
+reg [3:0]  reorder_registers [15:0];
+reg reorder_valid [15:0];
+
+reg [15:0] mather_0_index_reg;
+reg [3:0] mather_0_register_reg;
+reg [15:0] mather_0_value_reg;
+
+
+initial begin
+	for (i = 0; i < 16; i = i + 1) begin
+		reorder_registers[i] = 16'h8;
+		reorder_valid[i] = 0;
+	end
+
+always @(*) begin
+
+	mather_0_index_reg = mather_0_pc - current_reorder_pc;
+	mather_1_index_reg = mather_1_pc - current_reorder_pc;
+	memoreer_0_index_reg = memoreer_0_pc - current_reorder_pc;
+
+	if (reorder_valid[0]) begin
+		writeout_register_reg = reorder_registers[0];
+		writeout_value_reg = reorder_value[0];
+	end else begin
+		writeout_register_reg = 7;
+		writeout_value_reg = 0;
+	end
+
+end 
+
+always @(posedge clk) begin
+	if (mather_0_register != 8) begin
+		reorder_values[mather_0_index_reg] <= mather_0_value;
+		reorder_register[mather_0_index_reg] <= mather_0_register;
+		reorder_valid[mather_0_index_reg] <= 1;
+	end
+	if (mather_1_register != 8) begin
+		reorder_values[mather_1_index_reg] <= mather_1_value;
+		reorder_register[mather_1_index_reg] <= mather_1_register;
+		reorder_valid[mather_0_index_reg] <= 1;
+	end
+	if (memoreer_0_register != 8) begin
+		reorder_values[memoreer_0_index_reg] <= memoreer_0_value;
+		reorder_register[memoreer_0_index_reg] <= memoreer_0_register;
+		reorder_valid[mather_0_index_reg] <= 1;
+	end
+
+	if (reorder_valid[0]) begin
+		for (i = 0; i < 15; i = i + 1) begin
+			reorder_values[i] <= reorder_values[i + 1];
+			reorder_register[i] <= reorder_register[i + 1];
+			reorder_valid[i] <= reorder_valid[i + 1];
+		end
+		reorder_valid[15] <= 0;
+	end
+
+end
+
+	assign writeout_register = writeout_register_reg;
+	assign writeout_value = writeout_value_reg;
+
+
+endmodule
+
+
+module reservationer(clk, pc_in, operand_in, src1_in, src2_in, 
+
+parameter VALUE = 1'h0;
+parameter NAME  = 1'h1;
+
+endmodule
+
+/////////////////////////
+// REGISTER FILE       //
+/////////////////////////
+module inflight_registers(
+		clk, read_addr_dbg, read_value_dbg,
+		read_addr_0, read_addr_1, read_addr_2, read_addr_3, read_addr_4,  read_addr_5,
+		read_value_0, read_value_1, read_value_2, read_value_3, read_value_4,read_value_5    ,
+		write_addr_0, write_addr_1, write_addr_2, 
+		write_value_0, write_value_1, write_value_2 
+		);
+
+	input clk;
+	input[2:0] read_addr_dbg;
+	output[15:0] read_value_dbg;
+
+	input[2:0] read_addr_0;
+	input[2:0] read_addr_1;
+	input[2:0] read_addr_2;
+	input[2:0] read_addr_3;
+	input[2:0] read_addr_4;
+	input[2:0] read_addr_5;
+	input[2:0] write_addr_0;
+	input[2:0] write_addr_1;
+	input[2:0] write_addr_2;
+
+	input[15:0] write_value_0;
+	input[15:0] write_value_1;
+	input[15:0] write_value_2;
+
+	output[15:0] read_value_0;
+	output[15:0] read_value_1;
+	output[15:0] read_value_2;
+	output[15:0] read_value_3;
+	output[15:0] read_value_4;
+	output[15:0] read_value_5;
+
+	reg[15:0] rv0;
+	reg[15:0] rv1;
+	reg[15:0] rv2;
+	reg[15:0] rv3;
+	reg[15:0] rv4;
+	reg[15:0] rv5;
+	reg[15:0] rvdbg;
+
+	// How do I for loop?
+	reg [3:0] i;
+	reg [3:0] j;
+
+	wire[15:0] all_read_addrs[6:0];
+	wire[15:0] all_write_addrs[2:0];
+	wire[15:0] all_write_values[2:0];
+	reg[15:0] all_rv[6:0];
+
+	reg [15:0]regs[7:0];
+	
+	assign all_read_addrs[0] = read_addr_0;
+	assign all_read_addrs[1] = read_addr_1;
+	assign all_read_addrs[2] = read_addr_2;
+	assign all_read_addrs[3] = read_addr_3;
+	assign all_read_addrs[4] = read_addr_4;
+	assign all_read_addrs[5] = read_addr_5;
+	assign all_read_addrs[6] = read_addr_dbg;
+	
+	assign all_write_addrs[0] = write_addr_0;
+	assign all_write_addrs[1] = write_addr_1;
+	assign all_write_addrs[2] = write_addr_2;
+	assign all_write_values[0] = write_value_0;
+	assign all_write_values[1] = write_value_1;
+	assign all_write_values[2] = write_value_2;
+	
+	initial begin
+		regs[0] = 0;
+		regs[1] = 0;
+		regs[2] = 0;
+		regs[3] = 0;
+		regs[4] = 0;
+		regs[5] = 0;
+		regs[6] = 0;
+		regs[7] = 0;
+	end
+
+	always @(*) begin
+		for(i = 0; i < 7; i = i + 1) begin
+			all_rv[i] = regs[all_read_addrs[i]];
+			for(j = 0; j < 3; j = j + 1) begin
+				if(all_write_addrs[j] != 7 && all_read_addrs[i] == all_write_addrs[j]) begin
+					all_rv[i] = all_write_values[j];
+				end
+			end
+		end
+	end
+
+	always @(posedge clk) begin
+		for(i = 0; i < 3; i = i + 1) begin		
+			if (all_write_addrs[i] != 7) begin
+				regs[all_write_addrs[i]] <= all_write_values[i];
+			end
+		end
+	end
+
+	assign read_value_0 = all_rv[0];
+	assign read_value_1 = all_rv[1];
+	assign read_value_2 = all_rv[2];
+	assign read_value_3 = all_rv[3];
+	assign read_value_4 = all_rv[4];
+	assign read_value_5 = all_rv[5];
+	assign read_value_dbg = all_rv[6];
+
+endmodule
+
