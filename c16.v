@@ -1104,10 +1104,43 @@ endmodule
 //////////////////////////
 // RESERVATION STATIONS //
 //////////////////////////
-module reservationer(clk, pc_in, operand_in, src1_in, src2_in, 
+module reservationer(clk, pc_in, operand_in, src1_in, src2_in, src1_type, src2_type, name, dest, all_names, all_values,
+	op_out, arg1_out, arg2_out, pc_out, dest_out, name_out, stall_out)
+
+	parameter functional_unit_number = 1;
 
 	parameter VALUE = 1'b1;
 	parameter NAME = 1'b0;
+
+	input [15:0] pc_in;
+	input [3:0] operand_in;
+	input [15:0] src1_in;
+	input [15:0] src2_in;
+	input src1_type;
+	input src2_type;
+	input [15:0] name;
+	input [2:0] dest; //architected reg num
+	input [16 * functional_unit_number - 1:0] all_names;
+	input [16 * functional_unit_number - 1:0] all_values;
+	
+	output [3:0] op_out;
+	output [15:0] arg1_out;
+	output [15:0] arg2_out;
+	output [15:0] pc_out;
+	output [2:0] dest_out; //archtected reg num
+	output [15:0] name_out;
+	output stall_out;
+
+	reg [3:0] ops_queue [15:0];
+	reg [15:0] arg1_queue [15:0];
+	reg [15:0] arg2_queue [15:0];
+	reg [15:0] pc_queue [15:0];
+	reg [2:0] dest_queue [15:0];
+	reg [15:0] name_queue [15:0];
+	reg arg1_type_queue [15:0];
+	reg arg2_type_queue [15:0];
+
+	
 
 endmodule
 
