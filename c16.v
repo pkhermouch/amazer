@@ -867,12 +867,7 @@ module decoder_uno(clk, instruction_in, pc_in, execute_op, arg_0, arg_1, pc_out,
 				immediate_out_reg = $signed (instruction[7:0]);
 			end
 		endcase
-		/* Possibly loop
-		if(stall == 1) begin
-			execute_op_reg = DO_NOP;		
-			dest_reg = 7;
-		end
-		*/
+
 
 		if(pc_in == 16'hffff) begin
 			execute_op_reg = DO_NOP;
@@ -1112,6 +1107,9 @@ module reservationer(clk, pc_in, operand_in, src1_in, src2_in, src1_type, src2_t
 	parameter VALUE = 1'b1;
 	parameter NAME = 1'b0;
 
+	parameter DO_NOP  =3'h4; 
+
+	input clk;
 	input [15:0] pc_in;
 	input [3:0] operand_in;
 	input [15:0] src1_in;
@@ -1131,16 +1129,91 @@ module reservationer(clk, pc_in, operand_in, src1_in, src2_in, src1_type, src2_t
 	output [15:0] name_out;
 	output stall_out;
 
-	reg [3:0] ops_queue [15:0];
-	reg [15:0] arg1_queue [15:0];
-	reg [15:0] arg2_queue [15:0];
-	reg [15:0] pc_queue [15:0];
-	reg [2:0] dest_queue [15:0];
-	reg [15:0] name_queue [15:0];
-	reg arg1_type_queue [15:0];
-	reg arg2_type_queue [15:0];
+	reg [3:0] ops_buffer [15:0];
+	reg [15:0] arg1_buffer [15:0];
+	reg [15:0] arg2_buffer [15:0];
+	reg [15:0] pc_buffer [15:0];
+	reg [2:0] dest_buffer [15:0];
+	reg [15:0] name_buffer [15:0];
+	reg arg1_type_buffer [15:0];
+	reg arg2_type_buffer [15:0];
 
-	
+	reg [3:0] op_reg;
+	reg [15:0] arg1_reg;
+	reg [15:0] arg2_reg;
+	reg [15:0] pc_reg;
+	reg [2:0] dest_reg; //archtected reg num
+	reg [15:0] name_reg;
+	reg stall_reg;
+
+	reg[3:0] open_slot;
+	reg[3:0] ready_slot;
+	reg [3:0] i;
+	reg [3:0] j;
+	reg      buffer_is_full = 1;
+	reg is_there_something_ready;
+
+	always @(*) begin
+		buffer_is_full = 1;
+		is_there_something_ready = 0;
+		stall_reg = 0;
+		for(i = 0; i < 16; i = i + 1) begin
+			if(ops_buffer[i] == DO_NOP) begin
+				open_slot = i;
+				buffer_is_full = 0;
+			end else if(arg1_type_buffer[i] == VALUE && arg2_type_buffer[i] == VALUE) begin
+				ready_slot = i;
+				is_there_something_ready = 1;
+			end
+		end
+		if (buffer_is_full && op_in != DO_NOP) begin
+			stall_reg = 1;
+		end
+	end
+
+	always @(posedge clk) begin
+		if (is_there_something_ready) begin
+			op_reg <= ops_buffer[ready_slot];
+			arg1_reg <= arg1_buffer[ready_slot];
+			arg2_reg <= arg2_buffer[ready_slot];
+			pc_reg <= pc_buffer[ready_slot];
+			dest_reg <= dest_buffer[ready_slot];
+			name_reg <= name_buffer[ready_slot];
+			ops_buffer[ready_slot] <= DO_NOP; // indicate that this slot is now empty
+		end else begin
+			op_reg <= DO_NOP;
+		end
+		if (op_in != DO_NOP && !buffer_is_full) begin
+			ops_buffer[open_slot] <= op_in;
+			arg1_buffer[open_slot] <= src1_in;
+			arg2_buffer[open_slot] <= src2_in;
+			arg1_type_buffer[open_slot] <= src1_type;
+			arg2_type_buffer[open_slot] <= src2_type;
+			pc_buffer[open_slot] <= pc_in;
+			dest_buffer[open_slot] <= dest_in;//y
+			name_buffer[open_slot] <= name_in; //spree
+		end
+		for (i = 0; i < 16; i = i + 1) begin
+			for (j = 0; j < functional_unit_number; j = j + 1) begin
+				if (arg1_type_buffer[i] == NAME &&/*and*/all_names[16 * (j + 1) - 1:16 * j] == arg1_buffer[i]) begin
+					arg1_buffer[i] <= all_values[16 * (j + 1) - 1:16 * j];
+					arg1_type_buffer[i] <= VALUE;
+				end
+				if (arg2_type_buffer[i] == NAME &&/*and*/all_names[16 * (j + 1) - 1:16 * j] == arg2_buffer[i]) begin
+					arg2_buffer[i] <= all_values[16 * (j + 1) - 1:16 * j];
+					arg2_type_buffer[i] <= VALUE;
+				end
+			end
+		end
+	end
+
+	assign op_out = op_reg;
+	assign arg1_out = arg1_reg;
+	assign arg2_out = arg2_reg;
+	assign pc_out = pc_reg;
+	assign dest_out = dest_reg; //archtected reg num
+	assign name_out = name_reg;
+	assign stall_out = stall_reg;
 
 endmodule
 
@@ -1195,7 +1268,7 @@ module inflight_registers(
 	always @(*) begin
 		for (i = 0; i < read_port_number; i = i + 1) begin
 			read_values_reg[16 * (i + 1) - 1:16 * i] = regs[read_addrs[3* (i + 1) - 1:3 * i]];
-			read_types_reg[i] = reg_types[i]
+			read_types_reg[i] = reg_types[i];
 			// If we're getting a name, check if it just finished
 			if (reg_types[i] == NAME) begin
 				for (j = 0; j < write_port_number; j = j + 1) begin
