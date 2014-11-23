@@ -92,8 +92,7 @@ committed_registers(
 	.read_addr(SW[2:0]),
 	.read_value(reg_dbg),
 	.write_addr(writeout_register),
-	.write_value(writeout_value),
-	.write_enable(writeout_enable) 
+	.write_value(writeout_value)
 	);
 
 inflight_registers #(3, 3) (
@@ -168,12 +167,12 @@ decoder_uno(
 	.clk(clk),
 	.instruction_in(instruction),
 	.pc_in(fetch_pc),
-	.execute_op(scorebored_op),
-	.arg_0(scorebored_source_0),
-	.arg_1(scorebored_source_1),
-	.pc_out(scorebored_pc),
+	.execute_op(next_op),
+	.arg_0(next_source_0),
+	.arg_1(next_source_1),
+	.pc_out(next_pc),
 	.immediate_out(immediate_out),
-	.dest(scorebored_dest),
+	.dest(next_dest),
 	.stall(should_fetch_stall)
 	);
 
@@ -235,7 +234,87 @@ reorder_buffer(
 	.writeout_register(writeout_register), 
 	.writeout_value(writeout_value)
 	);
+
+// mather 0
+reservationer #(3) (
+	.clk(clk),
+	.pc_in(next_pc),
+	.op_in(reservationer_0_op),
+	.src1_in(src_1_input),
+	.src2_in(src_2_input),
+	.src1_type(src_1_type),
+	.src2_type(src_2_type),
+	.name(next_name),
+	.dest(next_dest),
+	.all_names(all_names),
+	.all_values(all_values),
+	.op_out(mather_0_operation),
+	.arg1_out(mather_0_operand_0),
+	.arg2_out(mather_0_operand_1),
+	.pc_out(mather_0_pc_in),
+	.dest_out(mather_0_dest_in), // E
+	.name_out(mather_0_name_in),
+	.stall_out(reservationer_0_stall)
+	);
 	
+reservationer #(3) (
+	.clk(clk),
+	.pc_in(next_pc),
+	.op_in(reservationer_1_op),
+	.src1_in(src_1_input),
+	.src2_in(src_2_input),
+	.src1_type(src_1_type),
+	.src2_type(src_2_type),
+	.name(next_name),
+	.dest(next_dest),
+	.all_names(all_names),
+	.all_values(all_values),
+	.op_out(mather_1_operation),
+	.arg1_out(mather_1_operand_0),
+	.arg2_out(mather_1_operand_1),
+	.pc_out(mather_1_pc_in),
+	.dest_out(mather_1_dest_in), // E
+	.name_out(mather_1_name_in),
+	.stall_out(reservationer_1_stall)
+	);
+
+reservationer #(3) (
+	.clk(clk),
+	.pc_in(next_pc),
+	.op_in(reservationer_2_op),
+	.src1_in(src_1_input),
+	.src2_in(src_2_input),
+	.src1_type(src_1_type),
+	.src2_type(src_2_type),
+	.name(next_name),
+	.dest(next_dest),
+	.all_names(all_names),
+	.all_values(all_values),
+	.op_out(memoreer_0_operation),
+	.arg1_out(memoreer_0_operand_0),
+	.arg2_out(memoreer_0_operand_1),
+	.pc_out(memoreer_0_pc_in),
+	.dest_out(memoreer_0_dest_in), // E
+	.name_out(memoreer_0_name_in),
+	.stall_out(reservationer_2_stall)
+	);
+
+reorder_buffer (
+	.clk(clk), 
+	.mather_0_pc(mather_0_pc_out), 
+	.mather_0_register(mather_0_dest_out), 
+	.mather_0_value(mather_0_value_out), 
+	.mather_1_pc(mather_1_pc_out), 
+	.mather_1_register(mather_1_dest_out), 
+	.mather_1_value(mather_1_value_out), 
+	.memoreer_0_pc(memoreer_0_pc_out), 
+	.memoreer_0_register(memoreer_0_dest_out), 
+	.memoreer_0_value(memoreer_0_value_out), 
+	.writeout_register(writeout_register), 
+	.writeout_value(writeout_value)
+);
+	
+
 // Begin scoreb0r3d modulez
 parameter MATHER_0 = 3'h0;
 parameter MATHER_1 = 3'h1;
@@ -245,301 +324,60 @@ parameter NO_RESOURCE = 3'h3;
 parameter DO_ADD = 3'h0;
 parameter DO_SUB = 3'h1;
 parameter DO_LOAD= 3'h2;
-parameter DO_STORE=3'h3;
+parameter DO_STORE=3'h3; // NONE OF THESE
 parameter DO_NOP  =3'h4; 
-
-parameter IN_ISSUE_STATE = 3'h0;
-parameter IN_READ_OPERANDS_STATE = 3'h1;
-parameter IN_EXECUTE_STATE = 3'h2;
-parameter IN_WRITEBACK_STATE = 3'h3;
-parameter IN_INITIAL_STATE = 3'h4;
-// ***RESOURCE STATUS, DO NOT DELETE***
-parameter BUSY = 3'h0;
-parameter NOT_BUSY = 3'h1;
-parameter BUSY_AND_WORKING = 3'h2;
-// register status, not as important
-parameter READY = 3'h0;
-parameter NOT_READY = 3'h1;
-parameter ACTUALLY_IMMEDIATE_VALUE = 3'h2;
-
 
 parameter USE_PC = 4'he;
 parameter USE_IMMEDIATE = 4'hf;
 
 reg should_fetch_stall_reg;
+reg[2:0] reservationer_0_op;
+reg[2:0] reservationer_2_op;
+reg[2:0] reservationer_1_op;
 
-
-reg [2:0] Instruction_Status [2:0]; // goes with IN_???_STATE
-reg [2:0] Register_Status [7:0];  //   what functional unit will produce the value for each register
-
-reg [2:0] Busy [2:0]; // indexed by MATHER_0 and shit
-
-reg [2:0] FU_Operations[2:0]; // the operation each FU will perform
-reg [2:0] Dest_Register [2:0];
-reg [3:0] Source_Register_0 [2:0]; // register number for operand 0
-reg [3:0] Source_Register_1 [2:0];
-reg [2:0] Source_Register_0_Resource [2:0];  // where operand 0 is being computed
-reg [2:0] Source_Register_1_Resource [2:0]; 
-reg [2:0] Source_Register_0_Ready [2:0];     // whether or not the register for operand 0 is ready to be used or in use by something else
-reg [2:0] Source_Register_1_Ready [2:0];
-
-reg [15:0] Operand_Values_0[2:0];
-reg [15:0] Operand_Values_1[2:0];
-
-reg [2:0] Result [2:0];
-reg [2:0] i;
-
-reg [2:0] resource_to_use;
-
-initial begin
-	Busy[0] = NOT_BUSY;
-	Busy[1] = NOT_BUSY;
-	Busy[2] = NOT_BUSY;
-	
-	FU_Operations[0] = DO_NOP;
-	FU_Operations[1] = DO_NOP;
-	FU_Operations[2] = DO_NOP;
-
-	Instruction_Status[0] = IN_INITIAL_STATE;
-	Instruction_Status[1] = IN_INITIAL_STATE;
-
-	Instruction_Status[2] = IN_INITIAL_STATE;
-	
-	Register_Status[0] = NO_RESOURCE;
-	Register_Status[1] = NO_RESOURCE;
-	Register_Status[2] = NO_RESOURCE;
-	Register_Status[3] = NO_RESOURCE;
-	Register_Status[4] = NO_RESOURCE;
-	Register_Status[5] = NO_RESOURCE;
-	Register_Status[6] = NO_RESOURCE;
-	Register_Status[7] = NO_RESOURCE;
-end
-
+reg[15:0] src_1_input;
+reg[15:0] src_2_input;
+reg src_1_type;
+reg src_2_type;
 
 always @(*) begin
-	should_fetch_stall_reg = 0;
-	resource_to_use = NO_RESOURCE;
-	if (scorebored_op == DO_ADD || scorebored_op == DO_SUB) begin
-		if ((Busy[MATHER_0] == NOT_BUSY || Busy[MATHER_1] == NOT_BUSY) && Register_Status[scorebored_dest] == NO_RESOURCE) begin
-			// we can issue
-			resource_to_use = Busy[MATHER_0] == NOT_BUSY ? MATHER_0 : MATHER_1;
-		end else begin
-			//stall
-			should_fetch_stall_reg = 1;
-		end
-	end
-	if (scorebored_op == DO_LOAD || scorebored_op == DO_STORE) begin
-		if (Busy[MEMOREER_0] == NOT_BUSY && Register_Status[scorebored_dest] == NO_RESOURCE) begin
-			resource_to_use = MEMOREER_0;
-		end else begin
-			should_fetch_stall_reg = 1;
-		end
-	end
-
-
-	mather_0_operation = DO_NOP;
-	mather_1_operation = DO_NOP;
-	memoreer_0_operation = DO_NOP;
+	should_fetch_stall_reg = reservationer_0_stall | reservationer_1_stall | reservationer_2_stall;
 	
-	if (Busy[MATHER_0] == BUSY) begin
-		if (Source_Register_0_Ready[MATHER_0] != NOT_READY  && Source_Register_1_Ready[MATHER_0] != NOT_READY) begin
-			mather_0_operation = FU_Operations[MATHER_0];
-
-			// both sources are ready. send data to functional unit
-			if (Source_Register_0_Ready[MATHER_0] == READY) begin
-				reg_addr_0 = Source_Register_0[MATHER_0][2:0];
-				mather_0_operand_0 = reg_value_0;
-			end else if(Source_Register_0_Ready[MATHER_0] == ACTUALLY_IMMEDIATE_VALUE) begin
-				//n nothing, because immediate value are by default placed in Operand_Values_0/1
-				mather_0_operand_0 = Operand_Values_0[MATHER_0];
-			end
-
-			if (Source_Register_1_Ready[MATHER_0] == READY) begin
-				reg_addr_1 = Source_Register_1[MATHER_0][2:0];
-				mather_0_operand_1 = reg_value_1;
-			end else if(Source_Register_1_Ready[MATHER_0] == ACTUALLY_IMMEDIATE_VALUE) begin
-				//n nothing, because immediate value are by default placed in Operand_Values_0/1
-				mather_0_operand_1 = Operand_Values_1[MATHER_0];
-			end
-
-		end
+	reservationer_0_op = DO_NOP;
+	reservationer_1_op = DO_NOP;
+	reservationer_2_op = DO_NOP;
+	if (next_op ==  DO_LOAD) begin
+		reservationer_2_op = DO_LOAD;
+	end else if (next_pc[0]) begin
+		reservationer_0_op = next_op;
+	end else begin
+		reservationer_1_op = next_op;
 	end
 
-	if (Busy[MATHER_1] == BUSY) begin
-		if (Source_Register_0_Ready[MATHER_1] != NOT_READY  && Source_Register_1_Ready[MATHER_1] != NOT_READY) begin
-			mather_1_operation = FU_Operations[MATHER_1];
-
-			// both sources are ready. send data to functional unit
-			if (Source_Register_0_Ready[MATHER_1] == READY) begin
-				reg_addr_2 = Source_Register_0[MATHER_1][2:0];
-				mather_1_operand_0 = reg_value_2;
-			end else if(Source_Register_0_Ready[MATHER_1] == ACTUALLY_IMMEDIATE_VALUE) begin
-				//n nothing, because immediate value are by default placed in Operand_Values_0/1
-				mather_1_operand_0 = Operand_Values_0[MATHER_1];
-			end
-
-			if (Source_Register_1_Ready[MATHER_1] == READY) begin
-				reg_addr_3 = Source_Register_1[MATHER_1][2:0];
-				mather_1_operand_1 = reg_value_3;
-			end else if(Source_Register_1_Ready[MATHER_1] == ACTUALLY_IMMEDIATE_VALUE) begin
-				//n nothing, because immediate value are by default placed in Operand_Values_0/1
-				mather_1_operand_1 = Operand_Values_1[MATHER_1];
-			end
-
-		end
+	if (next_source_0 == USE_PC) begin
+		src_2_input = next_pc + 1;
+		src_2_type = VALUE;
+	end else if (next_source_0 == USE_IMMEDIATE) begin
+		src_2_input = immediate_out;
+		src_2_type = VALUE;
+	end else begin
+		reg_addr_0 = next_source_0;
+		src_2_input = reg_value_0;
+		src_2_type = reg_type_0;
 	end
-
-	if (Busy[MEMOREER_0] == BUSY) begin
-		if (Source_Register_0_Ready[MEMOREER_0] != NOT_READY  && Source_Register_1_Ready[MEMOREER_0] != NOT_READY) begin
-			memoreer_0_operation = FU_Operations[MEMOREER_0];
-
-			// both sources are ready. send data to functional unit
-			if (Source_Register_0_Ready[MEMOREER_0] == READY) begin
-				reg_addr_4 = Source_Register_0[MEMOREER_0][2:0];
-				memoreer_0_operand_0 = reg_value_4;
-			end else if(Source_Register_0_Ready[MEMOREER_0] == ACTUALLY_IMMEDIATE_VALUE) begin
-				//n nothing, because immediate value are by default placed in Operand_Values_0/1
-				memoreer_0_operand_0 = Operand_Values_0[MEMOREER_0];
-			end
-			if (Source_Register_1_Ready[MEMOREER_0] == READY) begin
-				reg_addr_5 = Source_Register_1[MEMOREER_0][2:0];
-				memoreer_0_operand_2 = reg_value_5;
-			end
-			memoreer_0_operand_1 = Operand_Values_1[MEMOREER_0];
-		end
+	if (next_source_1 == USE_PC) begin
+		src_1_input = next_pc + 1;
+		src_1_type = VALUE;
+	end else if (next_source_1 == USE_IMMEDIATE) begin
+		src_1_input = immediate_out;
+		src_1_type = VALUE;
+	end else begin
+		reg_addr_1 = next_source_1;
+		src_1_input = reg_value_1;
+		src_1_type = reg_type_1;
 	end
 
 end
-
-always @(posedge clk) begin
-	// This is where we issue things
-	if (resource_to_use != NO_RESOURCE) begin
-		Register_Status[scorebored_dest] <= resource_to_use;
-		Busy[resource_to_use] <= BUSY;
-		Dest_Register[resource_to_use] <= scorebored_dest;
-		Source_Register_0[resource_to_use] <= scorebored_source_0;
-		Source_Register_1[resource_to_use] <= scorebored_source_1;
-		FU_Operations[resource_to_use] <= scorebored_op;
-		if (scorebored_source_0 == USE_PC) begin
-			Operand_Values_0[resource_to_use] <= scorebored_pc + 16'h1;
-			Source_Register_0_Resource[resource_to_use] <= NO_RESOURCE;
-			Source_Register_0_Ready[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
-		end else if (scorebored_source_0 == USE_IMMEDIATE) begin
-			Operand_Values_0[resource_to_use] <= immediate_out;
-			Source_Register_0_Resource[resource_to_use] <= NO_RESOURCE;
-			Source_Register_0_Ready[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
-		end else begin
-			Source_Register_0_Resource[resource_to_use] <= Register_Status[scorebored_source_0];
-			if (Register_Status[scorebored_source_0] != NO_RESOURCE) begin
-				Source_Register_0_Ready[resource_to_use] <= NOT_READY;
-			end else begin
-				Source_Register_0_Ready[resource_to_use] <= READY;
-			end 
-				
-		end
-		if (scorebored_op == DO_STORE) begin
-		   if (scorebored_source_1 == USE_PC) begin
-				Operand_Values_1[resource_to_use] <= scorebored_pc + 16'h1;
-			end else begin
-				Operand_Values_1[resource_to_use] <= immediate_out;
-					end
-					   // end else
-							Source_Register_1[resource_to_use] <= {1'h0, scorebored_dest};
-			Source_Register_1_Resource[resource_to_use] <= Register_Status[scorebored_dest];
-			if (Register_Status[scorebored_dest] != NO_RESOURCE) begin
-				Source_Register_1_Ready[resource_to_use] <= NOT_READY;
-			end else begin
-				Source_Register_1_Ready[resource_to_use] <= READY;
-			end
-			Register_Status[scorebored_dest] <= NO_RESOURCE;
-		end else
-		if (scorebored_source_1 == USE_PC) begin
-			Operand_Values_1[resource_to_use] <= scorebored_pc + 16'h1;
-			Source_Register_1_Resource[resource_to_use] <= NO_RESOURCE;
-			Source_Register_1_Ready[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
-		end else if (scorebored_source_1 == USE_IMMEDIATE) begin
-			Operand_Values_1[resource_to_use] <= immediate_out;
-			Source_Register_1_Resource[resource_to_use] <= NO_RESOURCE;
-			Source_Register_1_Ready[resource_to_use] <= ACTUALLY_IMMEDIATE_VALUE;
-		end else begin
-			Source_Register_1_Resource[resource_to_use] <= Register_Status[scorebored_source_1];
-			if (Register_Status[scorebored_source_1] != NO_RESOURCE) begin
-				Source_Register_1_Ready[resource_to_use] <= NOT_READY;
-			end else begin
-				Source_Register_1_Ready[resource_to_use] <= READY;
-			end 
-		end
-		
-	end
-	
-	// This is where we dispatch things
-	
-	if (mather_0_operation != DO_NOP) begin
-		Busy[MATHER_0] <= BUSY_AND_WORKING;
-	end
-	
-	if (mather_1_operation != DO_NOP) begin
-		Busy[MATHER_1] <= BUSY_AND_WORKING;
-	end
-	
-	if (memoreer_0_operation != DO_NOP) begin
-		Busy[MEMOREER_0] <= BUSY_AND_WORKING;
-	end
-	
-	
-	// This is where the done things are
-
-	if (mather_0_dest_out != 7) begin
-		Register_Status[mather_0_dest_out] <= NO_RESOURCE;
-		for (i = 0; i < 3; i = i + 1) begin
-			if(Source_Register_0_Resource[i] == MATHER_0) begin
-				Source_Register_0_Ready[i] <= READY;
-			end
-
-			if(Source_Register_1_Resource[i] == MATHER_0) begin
-				Source_Register_1_Ready[i] <= READY;
-			end
-		end
-		Busy[MATHER_0] <= NOT_BUSY;
-	end
-
-	if (mather_1_dest_out != 7) begin
-		Register_Status[mather_1_dest_out] <= NO_RESOURCE;
-		for (i = 0; i < 3; i = i + 1) begin
-			if(Source_Register_0_Resource[i] == MATHER_1) begin
-				Source_Register_0_Ready[i] <= READY;
-			end
-
-			if(Source_Register_1_Resource[i] == MATHER_1) begin
-				Source_Register_1_Ready[i] <= READY;
-			end
-		end
-		Busy[MATHER_1] <= NOT_BUSY;
-	end
-
-	if(memoreer_0_done == 1) begin
-		Busy[MEMOREER_0] <= NOT_BUSY;
-		if (memoreer_0_dest_out != 7) begin
-			Register_Status[memoreer_0_dest_out] <= NO_RESOURCE;
-			for (i = 0; i < 3; i = i + 1) begin
-				if(Source_Register_0_Resource[i] == MEMOREER_0) begin
-					Source_Register_0_Ready[i] <= READY;
-				end
-
-				if(Source_Register_1_Resource[i] == MEMOREER_0) begin
-					Source_Register_1_Ready[i] <= READY;
-				end
-			end
-		end
-	end
-
-end
-	
-assign should_fetch_stall = should_fetch_stall_reg;
-
-assign mather_0_dest_in = Dest_Register[MATHER_0];
-assign mather_1_dest_in = Dest_Register[MATHER_1];
-assign memoreer_0_dest_in = Dest_Register[MEMOREER_0];
 
 ///////////////////
 // debug support //
@@ -554,85 +392,7 @@ display(debug[11:8], HEX2);
 display(debug[7:4], HEX1);
 display(debug[3:0], HEX0);
 
-// what do we display
-always @(*) begin
-	if (SW[8]) begin
-		if (SW[1]) begin
-			debug = memory_value_in;
-		end else if (SW[0]) begin
-			debug = memory_value_out;
-		end else begin
-			debug = memoreer_addr;
-		end
-	// MATHER_0 debug
-	end else if (SW[7]) begin
-		if (SW[4]) begin
-			debug = mather_0_result;
-		end else if (SW[3]) begin
-			debug = {1'b0, Source_Register_0_Resource[MATHER_0], 1'b0, Source_Register_0_Ready[MATHER_0], 1'b0, Source_Register_1_Resource[MATHER_0], 1'b0, Source_Register_1_Ready[MATHER_0]};
-		end else if (SW[2]) begin
-			debug = {1'b0, Busy[MATHER_0], 1'b0, Dest_Register[MATHER_0], Source_Register_0[MATHER_0], Source_Register_1[MATHER_0]};
-		end else if (SW[1]) begin
-			debug = mather_0_operand_1;
-		end else if (SW[0]) begin
-			debug = mather_0_operand_0;
-		end else begin
-			debug = {5'h0, mather_0_operation, 1'h0, mather_0_dest_out, 1'h0, mather_0_dest_in};
-		end
-	// MATHER_1 debug
-	end else if (SW[6]) begin
-		if (SW[4]) begin
-			debug = mather_1_result;
-		end else if (SW[3]) begin
-			debug = {1'b0, Source_Register_0_Resource[MATHER_1], 1'b0, Source_Register_0_Ready[MATHER_1], 1'b0, Source_Register_1_Resource[MATHER_1], 1'b0, Source_Register_1_Ready[MATHER_1]};
-		end else if (SW[2]) begin
-			debug = {1'b0, Busy[MATHER_1], 1'b0, Dest_Register[MATHER_1], Source_Register_0[MATHER_1], Source_Register_1[MATHER_1]};
-		end else if (SW[1]) begin
-			debug = mather_1_operand_1;
-		end else if (SW[0]) begin
-			debug = mather_1_operand_0;
-		end else begin
-			debug = {5'h0, mather_1_operation, 1'h0, mather_1_dest_out, 1'h0, mather_1_dest_in};
-		end
-	// MEMOREER_0 debug
-	end else if (SW[5]) begin
-		if (SW[4]) begin
-			if (SW[3]) begin
-				debug = memoreer_0_operand_2;
-				end else begin
-			debug = memoreer_0_result; end
-		end else if (SW[3]) begin
-			debug = {1'b0, Source_Register_0_Resource[MEMOREER_0], 1'b0, Source_Register_0_Ready[MEMOREER_0], 1'b0, Source_Register_1_Resource[MEMOREER_0], 1'b0, Source_Register_1_Ready[MEMOREER_0]};
-		end else if (SW[2]) begin
-			debug = {1'b0, Busy[MEMOREER_0], 1'b0, Dest_Register[MEMOREER_0], Source_Register_0[MEMOREER_0], Source_Register_1[MEMOREER_0]};
-		end else if (SW[1]) begin
-			debug = memoreer_0_operand_1;
-		end else if (SW[0]) begin
-			debug = memoreer_0_operand_0;
-		end else begin
-			debug = {3'h0, memoreer_0_done, 1'h0, memoreer_0_operation, 1'h0, memoreer_0_dest_out, 1'h0, memoreer_0_dest_in};
-		end
-	end else if (SW[4]) begin
-		if (SW[3]) begin
-			debug = {5'b0, Register_Status[SW[2:0]]};
-		end else begin
-			debug = {1'b0, scorebored_op, scorebored_source_0, scorebored_source_1, 1'b0, scorebored_dest};
-		end
-   end else if (SW[3]) begin
-		if (SW[2]) begin
-			debug = immediate_out;
-		end else if (SW[1]) begin
-			debug = {5'h0, resource_to_use, 5'h0, scorebored_op};
-		end else if (SW[0]) begin
-			debug = instruction_addr;
-		end else begin
-			debug = instruction;
-		end
-	end else begin
-		debug = reg_dbg;
-	end
-end
-
+//do we display? no
 endmodule
 
 /////////////////////////
@@ -1099,7 +859,7 @@ endmodule
 //////////////////////////
 // RESERVATION STATIONS //
 //////////////////////////
-module reservationer(clk, pc_in, operand_in, src1_in, src2_in, src1_type, src2_type, name, dest, all_names, all_values,
+module reservationer(clk, pc_in, op_in, src1_in, src2_in, src1_type, src2_type, name, dest, all_names, all_values,
 	op_out, arg1_out, arg2_out, pc_out, dest_out, name_out, stall_out)
 
 	parameter functional_unit_number = 1;
@@ -1111,7 +871,7 @@ module reservationer(clk, pc_in, operand_in, src1_in, src2_in, src1_type, src2_t
 
 	input clk;
 	input [15:0] pc_in;
-	input [3:0] operand_in;
+	input [3:0] op_in;
 	input [15:0] src1_in;
 	input [15:0] src2_in;
 	input src1_type;
@@ -1309,11 +1069,10 @@ endmodule
 /////////////////////////////
 module committed_registers(
 		clk, read_addr, read_value,
-		write_addr, write_value, write_enable 
+		write_addr, write_value
 		);
 
 	input clk;
-	input write_enable;
 	input[2:0] read_addr;
 	input[2:0] write_addr;
 	input[15:0] write_value;
@@ -1333,7 +1092,7 @@ module committed_registers(
 
 	always @(*) begin
 		rv = regs[read_addr];
-		if (write_enable && read_addr == write_addr) begin
+		if (write_addr != 7 && read_addr == write_addr) begin
 			rv = write_value;
 		end
 	end
