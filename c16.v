@@ -41,20 +41,16 @@ output		     [6:0]		HEX3;
 
 wire clk = KEY[0];        // single step using key0
 
+wire reg_type_0;
+wire reg_type_1;
+wire reg_type_dbg;
+
 wire[15:0] reg_value_0;
 wire[15:0] reg_value_1;
-wire[15:0] reg_value_2;
-wire[15:0] reg_value_3;
-wire[15:0] reg_value_4;
-wire[15:0] reg_value_5;
 wire[15:0] reg_dbg;
 
 reg[2:0] reg_addr_0;
 reg[2:0] reg_addr_1;
-reg[2:0] reg_addr_2;
-reg[2:0] reg_addr_3;
-reg[2:0] reg_addr_5;
-reg[2:0] reg_addr_4;
 
 reg [15:0] mather_0_pc_in;
 reg [15:0] mather_0_operand_0;
@@ -85,53 +81,50 @@ wire [15:0] memoreer_0_pc_out;
 
 wire [3:0] writeout_register;
 wire [15:0] writeout_value;
+wire [15:0] writeout_enable;
 
-registers committed(
+// Used to reserve what you are computing
+wire [15:0] claim_name;
+wire [3:0] claim_addr;
+
+committed_registers(
 	.clk(clk),
-	.read_addr_0(0),
-	.read_addr_1(0),
-	.read_addr_2(0),
-	.read_addr_3(0),
-	.read_addr_4(0),
-	.read_addr_5(0),
-	.read_addr_dbg(SW[2:0]),
-	.write_addr_0(writeout_register),
-	.write_value_0(writeout_value),
-	.write_addr_1(7),
-	.write_value_1(0),
-	.write_addr_2(7),
-	.write_value_2(0),
-	.read_value_0(0),
-	.read_value_1(0),
-	.read_value_2(0),
-	.read_value_3(0),
-	.read_value_4(0),
-	.read_value_5(0),
-	.read_value_dbg(reg_dbg)
+	.read_addr(SW[2:0]),
+	.read_value(reg_dbg),
+	.write_addr(writeout_register),
+	.write_value(writeout_value),
+	.write_enable(writeout_enable) 
 	);
 
-registers inflight(
+inflight_registers #(3, 3) (
 	.clk(clk),
-	.read_addr_0(reg_addr_0),
-	.read_addr_1(reg_addr_1),
-	.read_addr_2(reg_addr_2),
-	.read_addr_3(reg_addr_3),
-	.read_addr_4(reg_addr_4),
-	.read_addr_5(reg_addr_5),
-	.read_addr_dbg(SW[2:0]),
-	.write_addr_0(mather_0_dest_out),
-	.write_value_0(mather_0_result),
-	.write_addr_1(mather_1_dest_out),
-	.write_value_1(mather_1_result),
-	.write_addr_2(memoreer_0_dest_out),
-	.write_value_2(memoreer_0_result),
-	.read_value_0(reg_value_0),
-	.read_value_1(reg_value_1),
-	.read_value_2(reg_value_2),
-	.read_value_3(reg_value_3),
-	.read_value_4(reg_value_4),
-	.read_value_5(reg_value_5),
-	.read_value_dbg(reg_dbg)
+	.read_addrs({
+		reg_addr_0,
+		reg_addr_1,
+		SW[2:0]
+		}),
+	.read_values({
+		reg_value_0,
+		reg_value_1,
+		reg_dbg
+		}),
+	.read_types({
+		reg_type_0,
+		reg_type_1,
+		reg_type_dbg
+		}),
+	.write_names({
+		mather_0_name_out,
+		mather_1_name_out,
+		memoreer_0_name_out,
+		}),
+	.write_values({
+		mather_0_result,
+		mather_1_result,
+		memoreer_0_result,
+		}),
+	.claim_addr(claim_addr),
+	.claim_name(claim_name)
 	);
 
 wire[15:0] instruction_addr;
@@ -145,6 +138,7 @@ fetcher(
 	.pc_out(fetch_pc),
 	.stall(should_fetch_stall)
 	);
+
 wire [15:0] memoreer_addr;
 wire memory_wren;
 wire [15:0] memory_value_in;
@@ -161,6 +155,7 @@ ram2 (
 	.q_a(instruction),
 	.q_b(memory_value_out) // value out for load instructions NOPE
  	);
+
 wire [2:0] scorebored_op;
 wire [3:0] scorebored_source_0;
 wire [3:0] scorebored_source_1;
@@ -205,7 +200,9 @@ mather(
 	.result(mather_1_result),
 	.pc_out(mather_1_pc_out)
 	);
+
 reg [15:0] memoreer_0_operand_2;
+
 memoreer(
 	.clk(clk),
 	.pc_in(memoreer_0_pc_in),
@@ -224,7 +221,8 @@ memoreer(
 	.done(memoreer_0_done)
 	);
 
-reorder_buffer( .clk(clk), 
+reorder_buffer( 
+	.clk(clk), 
 	.mather_0_pc(mather_0_pc_out), 
 	.mather_0_register(mather_0_dest_out), 
 	.mather_0_value(mather_0_result), 
@@ -637,118 +635,6 @@ end
 
 endmodule
 
-
-/////////////////////////
-// REGISTER FILE       //
-/////////////////////////
-module registers(
-		clk, read_addr_dbg, read_value_dbg,
-		read_addr_0, read_addr_1, read_addr_2, read_addr_3, read_addr_4,  read_addr_5,
-		read_value_0, read_value_1, read_value_2, read_value_3, read_value_4,read_value_5    ,
-		write_addr_0, write_addr_1, write_addr_2, 
-		write_value_0, write_value_1, write_value_2 
-		);
-
-	input clk;
-	input[2:0] read_addr_dbg;
-	output[15:0] read_value_dbg;
-
-	input[2:0] read_addr_0;
-	input[2:0] read_addr_1;
-	input[2:0] read_addr_2;
-	input[2:0] read_addr_3;
-	input[2:0] read_addr_4;
-	input[2:0] read_addr_5;
-	input[2:0] write_addr_0;
-	input[2:0] write_addr_1;
-	input[2:0] write_addr_2;
-
-	input[15:0] write_value_0;
-	input[15:0] write_value_1;
-	input[15:0] write_value_2;
-
-	output[15:0] read_value_0;
-	output[15:0] read_value_1;
-	output[15:0] read_value_2;
-	output[15:0] read_value_3;
-	output[15:0] read_value_4;
-	output[15:0] read_value_5;
-
-	reg[15:0] rv0;
-	reg[15:0] rv1;
-	reg[15:0] rv2;
-	reg[15:0] rv3;
-	reg[15:0] rv4;
-	reg[15:0] rv5;
-	reg[15:0] rvdbg;
-
-	// How do I for loop?
-	reg [3:0] i;
-	reg [3:0] j;
-
-	wire[15:0] all_read_addrs[6:0];
-	wire[15:0] all_write_addrs[2:0];
-	wire[15:0] all_write_values[2:0];
-	reg[15:0] all_rv[6:0];
-
-	reg [15:0]regs[7:0];
-	
-	assign all_read_addrs[0] = read_addr_0;
-	assign all_read_addrs[1] = read_addr_1;
-	assign all_read_addrs[2] = read_addr_2;
-	assign all_read_addrs[3] = read_addr_3;
-	assign all_read_addrs[4] = read_addr_4;
-	assign all_read_addrs[5] = read_addr_5;
-	assign all_read_addrs[6] = read_addr_dbg;
-	
-	assign all_write_addrs[0] = write_addr_0;
-	assign all_write_addrs[1] = write_addr_1;
-	assign all_write_addrs[2] = write_addr_2;
-	assign all_write_values[0] = write_value_0;
-	assign all_write_values[1] = write_value_1;
-	assign all_write_values[2] = write_value_2;
-	
-	initial begin
-		regs[0] = 0;
-		regs[1] = 0;
-		regs[2] = 0;
-		regs[3] = 0;
-		regs[4] = 0;
-		regs[5] = 0;
-		regs[6] = 0;
-		regs[7] = 0;
-	end
-
-	always @(*) begin
-		for(i = 0; i < 7; i = i + 1) begin
-			all_rv[i] = regs[all_read_addrs[i]];
-			for(j = 0; j < 3; j = j + 1) begin
-				if(all_write_addrs[j] != 7 && all_read_addrs[i] == all_write_addrs[j]) begin
-					all_rv[i] = all_write_values[j];
-				end
-			end
-		end
-	end
-
-	always @(posedge clk) begin
-		for(i = 0; i < 3; i = i + 1) begin		
-			if (all_write_addrs[i] != 7) begin
-				regs[all_write_addrs[i]] <= all_write_values[i];
-			end
-		end
-	end
-
-	assign read_value_0 = all_rv[0];
-	assign read_value_1 = all_rv[1];
-	assign read_value_2 = all_rv[2];
-	assign read_value_3 = all_rv[3];
-	assign read_value_4 = all_rv[4];
-	assign read_value_5 = all_rv[5];
-	assign read_value_dbg = all_rv[6];
-
-endmodule
-
-
 /////////////////////////
 // FETCH STAGE         //
 /////////////////////////
@@ -1121,215 +1007,236 @@ module memoreer(clk, pc_in,	operand_0, operand_1,
 	assign store_value = store_value_reg;
 endmodule
 
-
-
+////////////////////
+// REORDER BUFFER //
+////////////////////
 module reorder_buffer(clk, 
-mather_0_pc, mather_0_register, mather_0_value, 
-mather_1_pc, mather_1_register, mather_1_value, 
-memoreer_0_pc, memoreer_0_register, memoreer_0_value, 
-writeout_register, writeout_value)
-
-input clk;
-
-input [15:0] mather_0_pc;
-input [3:0] mather_0_register;
-input [15:0] mather_0_value;
-
-input [15:0] mather_1_pc;
-input [3:0] mather_1_register;
-input [15:0] mather_1_value;
-
-input [15:0] memoreer_0_pc;
-input [3:0] memoreer_0_register;
-input [15:0] memoreer_0_value;
-
-output [3:0] writeout_register; 
-output [15:0] writeout_value;
-
-reg [3:0] writeout_register_reg;
-reg [15:0] writeout_value_reg;
-
-reg [15:0] current_reorder_pc;
-reg [15:0] reorder_values [15:0];
-reg [3:0]  reorder_registers [15:0];
-reg reorder_valid [15:0];
-
-reg [15:0] mather_0_index_reg;
-reg [3:0] mather_0_register_reg;
-reg [15:0] mather_0_value_reg;
-
-
-initial begin
-	for (i = 0; i < 16; i = i + 1) begin
-		reorder_registers[i] = 16'h8;
-		reorder_valid[i] = 0;
-	end
-
-always @(*) begin
-
-	mather_0_index_reg = mather_0_pc - current_reorder_pc;
-	mather_1_index_reg = mather_1_pc - current_reorder_pc;
-	memoreer_0_index_reg = memoreer_0_pc - current_reorder_pc;
-
-	if (reorder_valid[0]) begin
-		writeout_register_reg = reorder_registers[0];
-		writeout_value_reg = reorder_value[0];
-	end else begin
-		writeout_register_reg = 7;
-		writeout_value_reg = 0;
-	end
-
-end 
-
-always @(posedge clk) begin
-	if (mather_0_register != 8) begin
-		reorder_values[mather_0_index_reg] <= mather_0_value;
-		reorder_register[mather_0_index_reg] <= mather_0_register;
-		reorder_valid[mather_0_index_reg] <= 1;
-	end
-	if (mather_1_register != 8) begin
-		reorder_values[mather_1_index_reg] <= mather_1_value;
-		reorder_register[mather_1_index_reg] <= mather_1_register;
-		reorder_valid[mather_0_index_reg] <= 1;
-	end
-	if (memoreer_0_register != 8) begin
-		reorder_values[memoreer_0_index_reg] <= memoreer_0_value;
-		reorder_register[memoreer_0_index_reg] <= memoreer_0_register;
-		reorder_valid[mather_0_index_reg] <= 1;
-	end
-
-	if (reorder_valid[0]) begin
-		for (i = 0; i < 15; i = i + 1) begin
-			reorder_values[i] <= reorder_values[i + 1];
-			reorder_register[i] <= reorder_register[i + 1];
-			reorder_valid[i] <= reorder_valid[i + 1];
+		mather_0_pc, mather_0_register, mather_0_value, 
+		mather_1_pc, mather_1_register, mather_1_value, 
+		memoreer_0_pc, memoreer_0_register, memoreer_0_value, 
+		writeout_register, writeout_value)
+	
+	input clk;
+	
+	input [15:0] mather_0_pc;
+	input [3:0] mather_0_register;
+	input [15:0] mather_0_value;
+	
+	input [15:0] mather_1_pc;
+	input [3:0] mather_1_register;
+	input [15:0] mather_1_value;
+	
+	input [15:0] memoreer_0_pc;
+	input [3:0] memoreer_0_register;
+	input [15:0] memoreer_0_value;
+	
+	output [3:0] writeout_register; 
+	output [15:0] writeout_value;
+	
+	reg [3:0] writeout_register_reg;
+	reg [15:0] writeout_value_reg;
+	
+	reg [15:0] current_reorder_pc;
+	reg [15:0] reorder_values [15:0];
+	reg [3:0]  reorder_registers [15:0];
+	reg reorder_valid [15:0];
+	
+	reg [15:0] mather_0_index_reg;
+	reg [3:0] mather_0_register_reg;
+	reg [15:0] mather_0_value_reg;
+	
+	
+	initial begin
+		for (i = 0; i < 16; i = i + 1) begin
+			reorder_registers[i] = 16'h8;
+			reorder_valid[i] = 0;
 		end
-		reorder_valid[15] <= 0;
 	end
-
-end
+	
+	always @(*) begin
+	
+		mather_0_index_reg = mather_0_pc - current_reorder_pc;
+		mather_1_index_reg = mather_1_pc - current_reorder_pc;
+		memoreer_0_index_reg = memoreer_0_pc - current_reorder_pc;
+	
+		if (reorder_valid[0]) begin
+			writeout_register_reg = reorder_registers[0];
+			writeout_value_reg = reorder_value[0];
+		end else begin
+			writeout_register_reg = 7;
+			writeout_value_reg = 0;
+		end
+	
+	end 
+	
+	always @(posedge clk) begin
+		if (mather_0_register != 8) begin
+			reorder_values[mather_0_index_reg] <= mather_0_value;
+			reorder_register[mather_0_index_reg] <= mather_0_register;
+			reorder_valid[mather_0_index_reg] <= 1;
+		end
+		if (mather_1_register != 8) begin
+			reorder_values[mather_1_index_reg] <= mather_1_value;
+			reorder_register[mather_1_index_reg] <= mather_1_register;
+			reorder_valid[mather_0_index_reg] <= 1;
+		end
+		if (memoreer_0_register != 8) begin
+			reorder_values[memoreer_0_index_reg] <= memoreer_0_value;
+			reorder_register[memoreer_0_index_reg] <= memoreer_0_register;
+			reorder_valid[mather_0_index_reg] <= 1;
+		end
+	
+		if (reorder_valid[0]) begin
+			for (i = 0; i < 15; i = i + 1) begin
+				reorder_values[i] <= reorder_values[i + 1];
+				reorder_register[i] <= reorder_register[i + 1];
+				reorder_valid[i] <= reorder_valid[i + 1];
+			end
+			reorder_valid[15] <= 0;
+		end
+	
+	end
 
 	assign writeout_register = writeout_register_reg;
 	assign writeout_value = writeout_value_reg;
-
-
 endmodule
 
-
+//////////////////////////
+// RESERVATION STATIONS //
+//////////////////////////
 module reservationer(clk, pc_in, operand_in, src1_in, src2_in, 
 
-parameter VALUE = 1'h0;
-parameter NAME  = 1'h1;
+	parameter VALUE = 1'b1;
+	parameter NAME = 1'b0;
 
 endmodule
 
-/////////////////////////
-// REGISTER FILE       //
-/////////////////////////
+////////////////////////////
+// INFLIGHT REGISTER FILE //
+////////////////////////////
 module inflight_registers(
-		clk, read_addr_dbg, read_value_dbg,
-		read_addr_0, read_addr_1, read_addr_2, read_addr_3, read_addr_4,  read_addr_5,
-		read_value_0, read_value_1, read_value_2, read_value_3, read_value_4,read_value_5    ,
-		write_addr_0, write_addr_1, write_addr_2, 
-		write_value_0, write_value_1, write_value_2 
+		clk,
+		read_addrs,
+		read_values,
+		read_types,
+		write_names,
+		write_values,
+		claim_addr,
+		claim_name
 		);
 
+	parameter read_port_number  = 1;
+	parameter write_port_number = 1;
+	parameter VALUE = 1'b1;
+	parameter NAME = 1'b0;
+
 	input clk;
-	input[2:0] read_addr_dbg;
-	output[15:0] read_value_dbg;
 
-	input[2:0] read_addr_0;
-	input[2:0] read_addr_1;
-	input[2:0] read_addr_2;
-	input[2:0] read_addr_3;
-	input[2:0] read_addr_4;
-	input[2:0] read_addr_5;
-	input[2:0] write_addr_0;
-	input[2:0] write_addr_1;
-	input[2:0] write_addr_2;
+	input[3 * read_port_number - 1:0] read_addrs;
+	input[16 * write_port_number - 1:0] write_names;
+	input[16 * write_port_number - 1:0] write_values;
 
-	input[15:0] write_value_0;
-	input[15:0] write_value_1;
-	input[15:0] write_value_2;
+	input[2:0] claim_addr;
+	input[15:0] claim_name;
 
-	output[15:0] read_value_0;
-	output[15:0] read_value_1;
-	output[15:0] read_value_2;
-	output[15:0] read_value_3;
-	output[15:0] read_value_4;
-	output[15:0] read_value_5;
-
-	reg[15:0] rv0;
-	reg[15:0] rv1;
-	reg[15:0] rv2;
-	reg[15:0] rv3;
-	reg[15:0] rv4;
-	reg[15:0] rv5;
-	reg[15:0] rvdbg;
+	output[16 * read_port_number - 1:0] read_values;
+	output[read_port_number - 1:0] read_types;
 
 	// How do I for loop?
-	reg [3:0] i;
-	reg [3:0] j;
+	reg[3:0] i;
+	reg[3:0] j;
 
-	wire[15:0] all_read_addrs[6:0];
-	wire[15:0] all_write_addrs[2:0];
-	wire[15:0] all_write_values[2:0];
-	reg[15:0] all_rv[6:0];
+	reg[16 * read_port_number - 1:0] read_values_reg;
+	reg[read_port_number - 1:0] read_types_reg;
 
-	reg [15:0]regs[7:0];
-	
-	assign all_read_addrs[0] = read_addr_0;
-	assign all_read_addrs[1] = read_addr_1;
-	assign all_read_addrs[2] = read_addr_2;
-	assign all_read_addrs[3] = read_addr_3;
-	assign all_read_addrs[4] = read_addr_4;
-	assign all_read_addrs[5] = read_addr_5;
-	assign all_read_addrs[6] = read_addr_dbg;
-	
-	assign all_write_addrs[0] = write_addr_0;
-	assign all_write_addrs[1] = write_addr_1;
-	assign all_write_addrs[2] = write_addr_2;
-	assign all_write_values[0] = write_value_0;
-	assign all_write_values[1] = write_value_1;
-	assign all_write_values[2] = write_value_2;
+	reg[15:0] regs [7:0];
+	reg reg_types [7:0];
 	
 	initial begin
-		regs[0] = 0;
-		regs[1] = 0;
-		regs[2] = 0;
-		regs[3] = 0;
-		regs[4] = 0;
-		regs[5] = 0;
-		regs[6] = 0;
-		regs[7] = 0;
+		for (i = 0; i < 8; i = i + 1) begin
+			reg_types[i] = VALUE;
+			regs[0] = 0;
+		end
 	end
 
 	always @(*) begin
-		for(i = 0; i < 7; i = i + 1) begin
-			all_rv[i] = regs[all_read_addrs[i]];
-			for(j = 0; j < 3; j = j + 1) begin
-				if(all_write_addrs[j] != 7 && all_read_addrs[i] == all_write_addrs[j]) begin
-					all_rv[i] = all_write_values[j];
+		for (i = 0; i < read_port_number; i = i + 1) begin
+			read_values_reg[16 * (i + 1) - 1:16 * i] = regs[read_addrs[3* (i + 1) - 1:3 * i]];
+			read_types_reg[i] = reg_types[i]
+			// If we're getting a name, check if it just finished
+			if (reg_types[i] == NAME) begin
+				for (j = 0; j < write_port_number; j = j + 1) begin
+					if (write_names[16 * (j + 1) - 1:16 * j] == regs[read_addrs[3* (i + 1) - 1:3 * i]]) begin
+						read_values_reg[16 * (i + 1) - 1:16 * i] = write_values[16 * (j + 1) - 1:16 * j];
+						read_types_reg[i] = VALUE;
+					end
 				end
 			end
 		end
 	end
 
+	assign read_values = read_values_reg;
+	assign read_types = read_types_reg;
+
 	always @(posedge clk) begin
-		for(i = 0; i < 3; i = i + 1) begin		
-			if (all_write_addrs[i] != 7) begin
-				regs[all_write_addrs[i]] <= all_write_values[i];
+		for (i = 0; i < 8; i = i + 1) begin
+			// If there's a name in a reg, check if we got the value
+			if (reg_types[i] == NAME) begin
+				for (j = 0; j < write_port_number; j = j + 1) begin
+					if (write_names[16 * (j + 1) - 1:16 * j] == regs[i]) begin
+						regs[i] <= write_values[16 * (j + 1) - 1:16 * j];
+						reg_types[i] <= VALUE;
+					end
+				end
 			end
+		end
+		// If you are going to compute a register, then claim it
+		if (claim_addr != 7) begin
+			regs[claim_addr] <= claim_name;
+			reg_types[claim_addr] <= NAME;
+		end
+	end
+endmodule
+
+/////////////////////////////
+// COMMITTED REGISTER FILE //
+/////////////////////////////
+module committed_registers(
+		clk, read_addr, read_value,
+		write_addr, write_value, write_enable 
+		);
+
+	input clk;
+	input write_enable;
+	input[2:0] read_addr;
+	input[2:0] write_addr;
+	input[15:0] write_value;
+
+	output[15:0] read_value;
+
+	reg[15:0] rv;
+	reg[15:0] regs [7:0];
+
+	reg[3:0] i;
+	
+	initial begin
+		for (i = 0; i < 8; i = i + 1) begin
+			regs[0] = 0;
 		end
 	end
 
-	assign read_value_0 = all_rv[0];
-	assign read_value_1 = all_rv[1];
-	assign read_value_2 = all_rv[2];
-	assign read_value_3 = all_rv[3];
-	assign read_value_4 = all_rv[4];
-	assign read_value_5 = all_rv[5];
-	assign read_value_dbg = all_rv[6];
+	always @(*) begin
+		rv = regs[read_addr];
+		if (write_enable && read_addr == write_addr) begin
+			rv = write_value;
+		end
+	end
 
+	assign read_value = rv;
+
+	always @(posedge clk) begin
+		if (write_addr != 7) begin
+			regs[write_addr] <= write_value;
+		end
+	end
 endmodule
-

@@ -1,0 +1,55 @@
+Our design is separated into stages much like p9, with the major differences
+that the D1 stage sets up the names/values of an instructions destination
+and operands, and the writeback of each functional unit goes into the reorder
+buffer rather than the committed registers directly.
+
+Stages
+======
+
+Fetch:
+------
+Our fetch stage fetches one instruction at a time and automatically gets the
+instructions from PCs one after another since we do not support branching.
+
+Decode 1:
+---------
+Decodes the instruction from fetch and, in the same cycle, sends the register
+numbers for the operands and destination of the instruction to the inflight
+registers, and assigns a number to the instruction to be used in renaming.
+The operands, operation, and destination, to the reservation station for the
+functional unit which handles the instruction.
+
+Decode 2:
+---------
+The reservation stations store the information about the instructions which
+need to be executed by their functional unit, and listen to the output from
+the functional units for operands which had an inflight name instead of a value.
+Once an instruction has all of the values it needs to be executed, it is
+dispatched to the functional unit.
+
+Execute (variable length):
+--------------------------
+Each functional unit takes its operands and operation and then some number of
+cycles later it latches all of its output values to be exposed to the writeback
+stage.
+
+Writeback:
+----------
+The values latched after the functional unit is done are sent simultaneously to
+the inflight register file, all of the reservation stations, and the reorder
+buffer. The reservation stations check the name of the output and capture the
+value if they have any instructions waiting on that name. The inflight register
+file changes the value at the destination if the name still matches. The
+reorder buffer stores the output and destination based on the pc in preparation
+for the commit stage. 
+
+Commit:
+-------
+The reorder buffer stores instruction results in a series of shift registers
+which order the results based on their pc. Once the instruction with the next
+committable pc is in the reorder buffer, the value of the next committable pc is
+incremented and all of the elements of the buffer are shifted down.
+
+Board I/O
+=========
+TODO what do switches do?
