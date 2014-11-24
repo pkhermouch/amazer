@@ -45,39 +45,49 @@ wire reg_type_0;
 wire reg_type_1;
 wire reg_type_dbg;
 
+wire [15:0] committed_dbg;
+wire [15:0] in_flight_dbg;
+
+
 wire[15:0] reg_value_0;
-wire[15:0] reg_value_1;
-wire[15:0] reg_dbg;
+wire[15:0] reg_value_1; 
 
 reg[2:0] reg_addr_0;
 reg[2:0] reg_addr_1;
 
-reg [15:0] mather_0_pc_in;
-reg [15:0] mather_0_operand_0;
-reg [15:0] mather_0_operand_1;
-reg [2:0] mather_0_operation;
+wire [15:0] mather_0_pc_in;
+wire [15:0] mather_0_operand_0;
+wire [15:0] mather_0_operand_1;
+wire [2:0] mather_0_operation;
 wire [2:0] mather_0_dest_in; // E 
 wire [2:0] mather_0_dest_out;
 wire [15:0] mather_0_result;
 wire [15:0] mather_0_pc_out;
+wire [15:0] mather_0_name_out;
+wire [15:0] mather_0_name_in;
 
-reg [15:0] mather_1_pc_in;
-reg [15:0] mather_1_operand_0;
-reg [15:0] mather_1_operand_1;
-reg [2:0] mather_1_operation;
+wire [15:0] mather_1_pc_in;
+wire [15:0] mather_1_operand_0;
+wire [15:0] mather_1_operand_1;
+wire [2:0] mather_1_operation;
 wire [2:0] mather_1_dest_in; // E 
 wire [2:0] mather_1_dest_out;
 wire [15:0] mather_1_result;
 wire [15:0] mather_1_pc_out;
+wire [15:0] mather_1_name_out;
+wire [15:0] mather_1_name_in;
 
-reg [15:0] memoreer_0_pc_in;
-reg [15:0] memoreer_0_operand_0;
-reg [15:0] memoreer_0_operand_1;
-reg [2:0] memoreer_0_operation;
+
+wire [15:0] memoreer_0_pc_in;
+wire [15:0] memoreer_0_operand_0;
+wire [15:0] memoreer_0_operand_1;
+wire [2:0] memoreer_0_operation;
 wire [2:0] memoreer_0_dest_in; // E 
 wire [2:0] memoreer_0_dest_out;
 wire [15:0] memoreer_0_result;
 wire [15:0] memoreer_0_pc_out;
+wire [15:0] memoreer_0_name_out;
+wire [15:0] memoreer_0_name_in;
 
 wire [3:0] writeout_register;
 wire [15:0] writeout_value;
@@ -87,15 +97,15 @@ wire [15:0] writeout_enable;
 wire [15:0] claim_name;
 wire [3:0] claim_addr;
 
-committed_registers(
+committed_registers a(
 	.clk(clk),
 	.read_addr(SW[2:0]),
-	.read_value(reg_dbg),
+	.read_value(committed_dbg),
 	.write_addr(writeout_register),
 	.write_value(writeout_value)
 	);
 
-inflight_registers #(3, 3) (
+inflight_registers  #(3, 3)b  (
 	.clk(clk),
 	.read_addrs({
 		reg_addr_0,
@@ -105,7 +115,7 @@ inflight_registers #(3, 3) (
 	.read_values({
 		reg_value_0,
 		reg_value_1,
-		reg_dbg
+		in_flight_dbg
 		}),
 	.read_types({
 		reg_type_0,
@@ -129,9 +139,13 @@ inflight_registers #(3, 3) (
 wire[15:0] instruction_addr;
 wire[15:0] instruction;
 wire[15:0] fetch_pc;
+wire reservationer_0_stall;
+wire reservationer_1_stall;
+wire reservationer_2_stall;
 wire should_fetch_stall;
 
-fetcher(
+assign should_fetch_stall = reservationer_0_stall | reservationer_1_stall | reservationer_2_stall;
+fetcher c(
 	.clk(clk),
 	.fetch_addr(instruction_addr),
 	.pc_out(fetch_pc),
@@ -143,7 +157,7 @@ wire memory_wren;
 wire [15:0] memory_value_in;
 wire [15:0] memory_value_out;
 
-ram2 (
+ram2 d (
 	.address_a(instruction_addr),
 	.address_b(memoreer_addr),
 	.clock(clk),
@@ -155,15 +169,16 @@ ram2 (
 	.q_b(memory_value_out) // value out for load instructions NOPE
  	);
 
-wire [2:0] scorebored_op;
-wire [3:0] scorebored_source_0;
-wire [3:0] scorebored_source_1;
-wire [15:0] scorebored_pc;
-wire [2:0] scorebored_dest;
+reg [15:0] next_name;
+wire [2:0] next_op;
+wire [3:0] next_source_0;
+wire [3:0] next_source_1;
+wire [15:0] next_pc;
+wire [2:0] next_dest;
 wire [15:0] immediate_out;
 wire memoreer_0_done;
 
-decoder_uno(
+decoder_uno e(
 	.clk(clk),
 	.instruction_in(instruction),
 	.pc_in(fetch_pc),
@@ -176,7 +191,7 @@ decoder_uno(
 	.stall(should_fetch_stall)
 	);
 
-mather(
+mather f(
 	.clk(clk),
 	.pc_in(mather_0_pc_in),
 	.operand_0(mather_0_operand_0),
@@ -185,10 +200,12 @@ mather(
 	.destination_in(mather_0_dest_in), // E 
 	.destination_out(mather_0_dest_out),
 	.result(mather_0_result),
-	.pc_out(mather_0_pc_out)
+	.pc_out(mather_0_pc_out),
+	.name_in(mather_0_name_in),
+	.name_out(mather_0_name_out)
 	);
 
-mather(
+mather g(
 	.clk(clk),
 	.pc_in(mather_1_pc_in),
 	.operand_0(mather_1_operand_0),
@@ -197,46 +214,35 @@ mather(
 	.destination_in(mather_1_dest_in), // E 
 	.destination_out(mather_1_dest_out),
 	.result(mather_1_result),
-	.pc_out(mather_1_pc_out)
+	.pc_out(mather_1_pc_out),
+	.name_in(mather_1_name_in),
+	.name_out(mather_1_name_out)
 	);
 
 reg [15:0] memoreer_0_operand_2;
+wire [47:0] all_names = {mather_0_name_out, mather_1_name_out, memoreer_0_name_out};
+wire [47:0] all_values = {mather_0_result, mather_1_result, memoreer_0_result};
 
-memoreer(
+memoreer h(
 	.clk(clk),
 	.pc_in(memoreer_0_pc_in),
 	.operand_0(memoreer_0_operand_0),
 	.operand_1(memoreer_0_operand_1),
-	.operand_2(memoreer_0_operand_2),
 	.operation(memoreer_0_operation),
 	.destination_in(memoreer_0_dest_in), // E 
 	.destination_out(memoreer_0_dest_out),
 	.mem_addr_out(memoreer_addr),
 	.mem_wren(memory_wren),
-	.store_value(memory_value_in),
 	.load_value(memory_value_out),
 	.result(memoreer_0_result),
 	.pc_out(memoreer_0_pc_out),
-	.done(memoreer_0_done)
-	);
-
-reorder_buffer( 
-	.clk(clk), 
-	.mather_0_pc(mather_0_pc_out), 
-	.mather_0_register(mather_0_dest_out), 
-	.mather_0_value(mather_0_result), 
-	.mather_1_pc(mather_1_pc_out), 
-	.mather_1_register(mather_1_dest_out), 
-	.mather_1_value,(mather_1_result) 
-	.memoreer_0_pc(memoreer_0_pc_out), 
-	.memoreer_0_register(memoreer_0_dest_out), 
-	.memoreer_0_value(memoreer_0_result), 
-	.writeout_register(writeout_register), 
-	.writeout_value(writeout_value)
+	.done(memoreer_0_done),
+	.name_in(memoreer_0_name_in),
+	.name_out(memoreer_0_name_out)
 	);
 
 // mather 0
-reservationer #(3) (
+reservationer     #(3)fgd (
 	.clk(clk),
 	.pc_in(next_pc),
 	.op_in(reservationer_0_op),
@@ -257,7 +263,7 @@ reservationer #(3) (
 	.stall_out(reservationer_0_stall)
 	);
 	
-reservationer #(3) (
+reservationer  #(3) kljfgd(
 	.clk(clk),
 	.pc_in(next_pc),
 	.op_in(reservationer_1_op),
@@ -278,7 +284,7 @@ reservationer #(3) (
 	.stall_out(reservationer_1_stall)
 	);
 
-reservationer #(3) (
+reservationer  #(3)sazvdc (
 	.clk(clk),
 	.pc_in(next_pc),
 	.op_in(reservationer_2_op),
@@ -299,22 +305,21 @@ reservationer #(3) (
 	.stall_out(reservationer_2_stall)
 	);
 
-reorder_buffer (
+	reorder_buffer i( 
 	.clk(clk), 
 	.mather_0_pc(mather_0_pc_out), 
 	.mather_0_register(mather_0_dest_out), 
-	.mather_0_value(mather_0_value_out), 
+	.mather_0_value(mather_0_result), 
 	.mather_1_pc(mather_1_pc_out), 
 	.mather_1_register(mather_1_dest_out), 
-	.mather_1_value(mather_1_value_out), 
+	.mather_1_value(mather_1_result),
 	.memoreer_0_pc(memoreer_0_pc_out), 
 	.memoreer_0_register(memoreer_0_dest_out), 
-	.memoreer_0_value(memoreer_0_value_out), 
+	.memoreer_0_value(memoreer_0_result), 
 	.writeout_register(writeout_register), 
 	.writeout_value(writeout_value)
-);
+	);
 	
-
 // Begin scoreb0r3d modulez
 parameter MATHER_0 = 3'h0;
 parameter MATHER_1 = 3'h1;
@@ -330,7 +335,9 @@ parameter DO_NOP  =3'h4;
 parameter USE_PC = 4'he;
 parameter USE_IMMEDIATE = 4'hf;
 
-reg should_fetch_stall_reg;
+parameter VALUE = 1'b1;
+parameter NAME = 1'b0;
+
 reg[2:0] reservationer_0_op;
 reg[2:0] reservationer_2_op;
 reg[2:0] reservationer_1_op;
@@ -340,9 +347,11 @@ reg[15:0] src_2_input;
 reg src_1_type;
 reg src_2_type;
 
+initial begin
+	next_name = 0;
+end
+
 always @(*) begin
-	should_fetch_stall_reg = reservationer_0_stall | reservationer_1_stall | reservationer_2_stall;
-	
 	reservationer_0_op = DO_NOP;
 	reservationer_1_op = DO_NOP;
 	reservationer_2_op = DO_NOP;
@@ -361,7 +370,7 @@ always @(*) begin
 		src_2_input = immediate_out;
 		src_2_type = VALUE;
 	end else begin
-		reg_addr_0 = next_source_0;
+		reg_addr_0 = next_source_0[2:0];
 		src_2_input = reg_value_0;
 		src_2_type = reg_type_0;
 	end
@@ -372,11 +381,15 @@ always @(*) begin
 		src_1_input = immediate_out;
 		src_1_type = VALUE;
 	end else begin
-		reg_addr_1 = next_source_1;
+		reg_addr_1 = next_source_1[2:0];
 		src_1_input = reg_value_1;
 		src_1_type = reg_type_1;
 	end
 
+end
+
+always @(posedge clk) begin
+	next_name = next_name + 1;
 end
 
 ///////////////////
@@ -385,14 +398,30 @@ end
 reg [15:0]debug;
 
 assign LEDR = fetch_pc[9:0];
-assign LEDG = {should_fetch_stall, memoreer_0_done, memory_wren, 5'h0};
+assign LEDG = {reservationer_0_stall, reservationer_1_stall, reservationer_2_stall, 5'h0};
 
-display(debug[15:12], HEX3);
-display(debug[11:8], HEX2);
-display(debug[7:4], HEX1);
-display(debug[3:0], HEX0);
+display fjff(debug[15:12], HEX3);
+display jfjfjfj(debug[11:8], HEX2);
+display jjjj(debug[7:4], HEX1);
+display jj(debug[3:0], HEX0);
 
 //do we display? no
+always @(*) begin
+	if (SW[9]) begin
+		debug = instruction;
+	end else if (SW[8]) begin
+	end else if (SW[7]) begin
+	end else if (SW[6]) begin
+	end else if (SW[5]) begin
+	end else if (SW[4]) begin
+		if(SW[3])
+			debug = in_flight_dbg;
+		else
+			debug = {15'b0, reg_type_dbg};
+	end else if (SW[3]) begin
+		debug = committed_dbg;
+	end
+end
 endmodule
 
 /////////////////////////
@@ -464,7 +493,7 @@ module display(NUM, HEX);
 	endcase
 endmodule
 
-module mather (clk, pc_in, operand_0, operand_1, operation, destination_in, destination_out, result, pc_out);
+module mather (clk, pc_in, operand_0, operand_1, operation, destination_in, destination_out, result, pc_out, name_in, name_out);
 
 	parameter DO_ADD = 4'h0;
 	parameter DO_SUB = 4'h1;
@@ -476,12 +505,13 @@ module mather (clk, pc_in, operand_0, operand_1, operation, destination_in, dest
 	input [15:0] operand_1;
 	input [15:0] operation;
 	input [2:0]  destination_in;
+	input [15:0] name_in;
 
 	output [2:0] destination_out;
 	output [15:0] result;
 	output [15:0] pc_out;
+	output [15:0] name_out;
 
-	
 	reg [15:0] operand_0_reg;
 	reg [15:0] operand_1_reg;
 	reg [15:0] operation_reg;
@@ -491,7 +521,8 @@ module mather (clk, pc_in, operand_0, operand_1, operation, destination_in, dest
 	reg [15:0] result_latch;
 	reg [2:0] dest_latch;
 	reg [15:0] pc_latch;
-
+	reg [15:0] name_latch;
+	
 	always @(*)
 		case (operation_reg)
 			DO_ADD: result_reg = operand_0_reg + operand_1_reg;
@@ -510,11 +541,13 @@ module mather (clk, pc_in, operand_0, operand_1, operation, destination_in, dest
 		operation_reg <= operation;
 		destination_in_reg <= destination_in;
 		pc_latch <= pc_in;
+		name_latch <= name_in;
 	end
 
 	assign result = result_latch;
 	assign destination_out = dest_latch;
 	assign pc_out = pc_latch;
+	assign name_out = name_latch;
 endmodule
 
 module decoder_uno(clk, instruction_in, pc_in, execute_op, arg_0, arg_1, pc_out, immediate_out, dest, stall);
@@ -660,34 +693,33 @@ endmodule
 
 
 module memoreer(clk, pc_in,	operand_0, operand_1,
-	operation, 	destination_in,	destination_out, 	mem_addr_out, operand_2,
-	mem_wren, 	load_value,	store_value, result,	pc_out, done);
+	operation, 	destination_in,	destination_out, 	mem_addr_out,
+	mem_wren, 	load_value,	result,	pc_out, done, name_in, name_out);
 
 	parameter DO_LOAD= 3'h2;
-	parameter DO_STORE=3'h3;
 	parameter DO_NOP  =3'h4; 
 
 	input clk;
 	input [15:0] pc_in;
+	input [15:0] name_in;
 	input [15:0] operand_0;
 	input [15:0] operand_1;
-	input [15:0] operand_2;
 	input [3:0]  operation;
 	input [3:0]  destination_in;
 	input [15:0] load_value;
 	output [3:0] destination_out;
 	output [15:0] mem_addr_out;
-	output [15:0] store_value;
 	output [15:0] result;
 	output [15:0] pc_out;	
+	output [15:0] name_out;	
 	output mem_wren;
 
 	output done;
 
 	reg [15:0] pc_in_reg;
+	reg [15:0] name_in_reg;
 	reg [15:0] operand_0_reg;
 	reg [15:0] operand_1_reg;
-	reg [15:0] operand_2_reg;
 	reg [3:0]  operation_reg;
 	reg [3:0]  destination_in_reg;
 	
@@ -695,10 +727,10 @@ module memoreer(clk, pc_in,	operand_0, operand_1,
 	reg [31:0] cycles_we_have_stalled;
 	reg start_stalin;
 	reg mem_wren_reg;
-	reg [15:0] store_value_reg;
 
 	reg [15:0] result_save;
 	reg [15:0] pc_save;
+	reg [15:0] name_save;
 	reg [2:0]  destination_save;
 	reg done_reg;
 	reg [3:0]  operation_save;
@@ -716,11 +748,7 @@ module memoreer(clk, pc_in,	operand_0, operand_1,
 				mem_addr_out_reg = operand_0_reg + operand_1_reg;
 				start_stalin = 1;
 			end
-			DO_STORE: begin
-				mem_addr_out_reg = operand_0_reg + operand_1_reg;
-				mem_wren_reg = 1;
-				start_stalin = 1;
-			end
+			
 		endcase
 		
 	end
@@ -728,9 +756,10 @@ module memoreer(clk, pc_in,	operand_0, operand_1,
 	always @(posedge clk) begin
 		if (start_stalin == 1) begin
 			cycles_we_have_stalled <= 0;
-			pc_save <= pc_in;
+			pc_save <= pc_in_reg;
+			name_save <= name_in_reg;
 			operation_save <= operation_reg;
-			destination_save <= destination_in;
+			destination_save <= destination_in_reg;
 		end else begin
 			cycles_we_have_stalled <= cycles_we_have_stalled + 1;
 		end
@@ -745,10 +774,9 @@ module memoreer(clk, pc_in,	operand_0, operand_1,
 			done_reg <= 0;
 		end
 		pc_in_reg <= pc_in;
+		name_in_reg <= name_in;
 		operand_0_reg <= operand_0;
 		operand_1_reg <= operand_1;
-		operand_2_reg <= operand_2;
-		store_value_reg <= operand_2;
 		operation_reg <= operation;
 		destination_in_reg <= destination_in;
 	end
@@ -757,9 +785,9 @@ module memoreer(clk, pc_in,	operand_0, operand_1,
 	assign destination_out = destination_save;
 	assign done = done_reg;
 	assign pc_out = pc_save;
+	assign name_out = name_save;
 	assign result = result_save;
 	assign mem_wren = mem_wren_reg;
-	assign store_value = store_value_reg;
 endmodule
 
 ////////////////////
@@ -769,7 +797,7 @@ module reorder_buffer(clk,
 		mather_0_pc, mather_0_register, mather_0_value, 
 		mather_1_pc, mather_1_register, mather_1_value, 
 		memoreer_0_pc, memoreer_0_register, memoreer_0_value, 
-		writeout_register, writeout_value)
+		writeout_register, writeout_value);
 	
 	input clk;
 	
@@ -799,9 +827,16 @@ module reorder_buffer(clk,
 	reg [15:0] mather_0_index_reg;
 	reg [3:0] mather_0_register_reg;
 	reg [15:0] mather_0_value_reg;
-	
+	reg [15:0] mather_1_index_reg;
+	reg [3:0] mather_1_register_reg;
+	reg [15:0] mather_1_value_reg;
+	reg [15:0] memoreer_0_index_reg;
+	reg [3:0] memoreer_0_register_reg;
+	reg [15:0] memoreer_0_value_reg;
+	reg [4:0] i;
 	
 	initial begin
+		current_reorder_pc = 0;
 		for (i = 0; i < 16; i = i + 1) begin
 			reorder_registers[i] = 16'h8;
 			reorder_valid[i] = 0;
@@ -816,7 +851,7 @@ module reorder_buffer(clk,
 	
 		if (reorder_valid[0]) begin
 			writeout_register_reg = reorder_registers[0];
-			writeout_value_reg = reorder_value[0];
+			writeout_value_reg = reorder_values[0];
 		end else begin
 			writeout_register_reg = 7;
 			writeout_value_reg = 0;
@@ -827,27 +862,28 @@ module reorder_buffer(clk,
 	always @(posedge clk) begin
 		if (mather_0_register != 8) begin
 			reorder_values[mather_0_index_reg] <= mather_0_value;
-			reorder_register[mather_0_index_reg] <= mather_0_register;
+			reorder_registers[mather_0_index_reg] <= mather_0_register;
 			reorder_valid[mather_0_index_reg] <= 1;
 		end
 		if (mather_1_register != 8) begin
 			reorder_values[mather_1_index_reg] <= mather_1_value;
-			reorder_register[mather_1_index_reg] <= mather_1_register;
+			reorder_registers[mather_1_index_reg] <= mather_1_register;
 			reorder_valid[mather_0_index_reg] <= 1;
 		end
 		if (memoreer_0_register != 8) begin
 			reorder_values[memoreer_0_index_reg] <= memoreer_0_value;
-			reorder_register[memoreer_0_index_reg] <= memoreer_0_register;
+			reorder_registers[memoreer_0_index_reg] <= memoreer_0_register;
 			reorder_valid[mather_0_index_reg] <= 1;
 		end
 	
 		if (reorder_valid[0]) begin
 			for (i = 0; i < 15; i = i + 1) begin
 				reorder_values[i] <= reorder_values[i + 1];
-				reorder_register[i] <= reorder_register[i + 1];
+				reorder_registers[i] <= reorder_registers[i + 1];
 				reorder_valid[i] <= reorder_valid[i + 1];
 			end
 			reorder_valid[15] <= 0;
+			current_reorder_pc <= current_reorder_pc + 1;
 		end
 	
 	end
@@ -860,7 +896,7 @@ endmodule
 // RESERVATION STATIONS //
 //////////////////////////
 module reservationer(clk, pc_in, op_in, src1_in, src2_in, src1_type, src2_type, name, dest, all_names, all_values,
-	op_out, arg1_out, arg2_out, pc_out, dest_out, name_out, stall_out)
+	op_out, arg1_out, arg2_out, pc_out, dest_out, name_out, stall_out);
 
 	parameter functional_unit_number = 1;
 
@@ -908,8 +944,8 @@ module reservationer(clk, pc_in, op_in, src1_in, src2_in, src1_type, src2_type, 
 
 	reg[3:0] open_slot;
 	reg[3:0] ready_slot;
-	reg [3:0] i;
-	reg [3:0] j;
+	reg [4:0] i;
+	reg [4:0] j;
 	reg      buffer_is_full = 1;
 	reg is_there_something_ready;
 
@@ -950,17 +986,17 @@ module reservationer(clk, pc_in, op_in, src1_in, src2_in, src1_type, src2_type, 
 			arg1_type_buffer[open_slot] <= src1_type;
 			arg2_type_buffer[open_slot] <= src2_type;
 			pc_buffer[open_slot] <= pc_in;
-			dest_buffer[open_slot] <= dest_in;//y
-			name_buffer[open_slot] <= name_in; //spree
+			dest_buffer[open_slot] <= dest;//y
+			name_buffer[open_slot] <= name; //spree
 		end
 		for (i = 0; i < 16; i = i + 1) begin
 			for (j = 0; j < functional_unit_number; j = j + 1) begin
-				if (arg1_type_buffer[i] == NAME &&/*and*/all_names[16 * (j + 1) - 1:16 * j] == arg1_buffer[i]) begin
-					arg1_buffer[i] <= all_values[16 * (j + 1) - 1:16 * j];
+				if (arg1_type_buffer[i] == NAME &&/*and*/all_names[16 * j+:16] == arg1_buffer[i]) begin
+					arg1_buffer[i] <= all_values[16 * j+:16];
 					arg1_type_buffer[i] <= VALUE;
 				end
-				if (arg2_type_buffer[i] == NAME &&/*and*/all_names[16 * (j + 1) - 1:16 * j] == arg2_buffer[i]) begin
-					arg2_buffer[i] <= all_values[16 * (j + 1) - 1:16 * j];
+				if (arg2_type_buffer[i] == NAME &&/*and*/all_names[16 * j+:16] == arg2_buffer[i]) begin
+					arg2_buffer[i] <= all_values[16 * j+:16];
 					arg2_type_buffer[i] <= VALUE;
 				end
 			end
@@ -1021,19 +1057,19 @@ module inflight_registers(
 	initial begin
 		for (i = 0; i < 8; i = i + 1) begin
 			reg_types[i] = VALUE;
-			regs[0] = 0;
+			regs[i] = 0;
 		end
 	end
 
 	always @(*) begin
 		for (i = 0; i < read_port_number; i = i + 1) begin
-			read_values_reg[16 * (i + 1) - 1:16 * i] = regs[read_addrs[3* (i + 1) - 1:3 * i]];
+			read_values_reg[16 * i+:16] = regs[read_addrs[3* i+:3]];
 			read_types_reg[i] = reg_types[i];
 			// If we're getting a name, check if it just finished
 			if (reg_types[i] == NAME) begin
 				for (j = 0; j < write_port_number; j = j + 1) begin
-					if (write_names[16 * (j + 1) - 1:16 * j] == regs[read_addrs[3* (i + 1) - 1:3 * i]]) begin
-						read_values_reg[16 * (i + 1) - 1:16 * i] = write_values[16 * (j + 1) - 1:16 * j];
+					if (write_names[16 * j+:16] == regs[read_addrs[3* i+:3]]) begin
+						read_values_reg[16 * i+:16] = write_values[16 * j+:16];
 						read_types_reg[i] = VALUE;
 					end
 				end
@@ -1049,8 +1085,8 @@ module inflight_registers(
 			// If there's a name in a reg, check if we got the value
 			if (reg_types[i] == NAME) begin
 				for (j = 0; j < write_port_number; j = j + 1) begin
-					if (write_names[16 * (j + 1) - 1:16 * j] == regs[i]) begin
-						regs[i] <= write_values[16 * (j + 1) - 1:16 * j];
+					if (write_names[16 * j+:16] == regs[i]) begin
+						regs[i] <= write_values[16 * j+:16];
 						reg_types[i] <= VALUE;
 					end
 				end
@@ -1086,7 +1122,7 @@ module committed_registers(
 	
 	initial begin
 		for (i = 0; i < 8; i = i + 1) begin
-			regs[0] = 0;
+			regs[i] = 0;
 		end
 	end
 
