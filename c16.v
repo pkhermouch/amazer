@@ -883,10 +883,47 @@ module reorder_buffer(clk,
 	
 	initial begin
 		current_reorder_pc = 0;
+        reorder_valid[0] <= 0;
+        reorder_valid[1] <= 0;
+        reorder_valid[2] <= 0;
+        reorder_valid[3] <= 0;
+        reorder_valid[4] <= 0;
+        reorder_valid[5] <= 0;
+        reorder_valid[6] <= 0;
+        reorder_valid[7] <= 0;
+        reorder_valid[8] <= 0;
+        reorder_valid[9] <= 0;
+        reorder_valid[10] <= 0;
+        reorder_valid[11] <= 0;
+        reorder_valid[12] <= 0;
+        reorder_valid[13] <= 0;
+        reorder_valid[14] <= 0;
+        reorder_valid[15] <= 0;
+
+       reorder_registers[0] <= 4'h8;
+               reorder_registers[1] <= 4'h8;
+                       reorder_registers[2] <= 4'h8;
+                               reorder_registers[3] <= 4'h8;
+                                       reorder_registers[4] <= 4'h8;
+                                               reorder_registers[5] <= 4'h8;
+                                                       reorder_registers[6] <= 4'h8;
+                                                               reorder_registers[7] <= 4'h8;
+                                                                       reorder_registers[8] <= 4'h8;
+                                                                               reorder_registers[9] <= 4'h8;
+                                                                                       reorder_registers[10] <= 4'h8;
+                                                                                               reorder_registers[11] <= 4'h8;
+                                                                                                       reorder_registers[12] <= 4'h8;
+                                                                                                               reorder_registers[13] <= 4'h8;
+                                                                                                                       reorder_registers[14] <= 4'h8;
+                                                                                                                               reorder_registers[15] <= 4'h8;
+                                                                                                                                       reorder_valid[16] <= 0;
+                                                                                                                                       /*                   
+		
 		for (i = 0; i < 16; i = i + 1) begin
 			reorder_registers[i] = 4'h8;
 			reorder_valid[i] = 0;
 		end
+        */
 	end
 	
 	always @(*) begin
@@ -923,11 +960,61 @@ module reorder_buffer(clk,
 		end
 	
 		if (reorder_valid[0]) begin
+                reorder_values[0] <= reorder_values[1];
+                reorder_values[1] <= reorder_values[2];
+                reorder_values[2] <= reorder_values[3];
+                reorder_values[3] <= reorder_values[4];
+                reorder_values[4] <= reorder_values[5];
+                reorder_values[5] <= reorder_values[6];
+                reorder_values[6] <= reorder_values[7];
+                reorder_values[7] <= reorder_values[8];
+                reorder_values[8] <= reorder_values[9];
+                reorder_values[9] <= reorder_values[10];
+                reorder_values[10] <= reorder_values[11];
+                reorder_values[11] <= reorder_values[12];
+                reorder_values[12] <= reorder_values[13];
+                reorder_values[13] <= reorder_values[14];
+                reorder_values[14] <= reorder_values[15];
+                
+                reorder_registers[0] <= reorder_registers[1];
+                reorder_registers[1] <= reorder_registers[2];
+                reorder_registers[2] <= reorder_registers[3];
+                reorder_registers[3] <= reorder_registers[4];
+                reorder_registers[4] <= reorder_registers[5];
+                reorder_registers[5] <= reorder_registers[6];
+                reorder_registers[6] <= reorder_registers[7];
+                reorder_registers[7] <= reorder_registers[8];
+                reorder_registers[8] <= reorder_registers[9];
+                reorder_registers[9] <= reorder_registers[10];
+                reorder_registers[10] <= reorder_registers[11];
+                reorder_registers[11] <= reorder_registers[12];
+                reorder_registers[12] <= reorder_registers[13];
+                reorder_registers[13] <= reorder_registers[14];
+                reorder_registers[14] <= reorder_registers[15];
+                
+                reorder_valid[0] <= reorder_valid[1];
+                reorder_valid[1] <= reorder_valid[2];
+                reorder_valid[2] <= reorder_valid[3];
+                reorder_valid[3] <= reorder_valid[4];
+                reorder_valid[4] <= reorder_valid[5];
+                reorder_valid[5] <= reorder_valid[6];
+                reorder_valid[6] <= reorder_valid[7];
+                reorder_valid[7] <= reorder_valid[8];
+                reorder_valid[8] <= reorder_valid[9];
+                reorder_valid[9] <= reorder_valid[10];
+                reorder_valid[10] <= reorder_valid[11];
+                reorder_valid[11] <= reorder_valid[12];
+                reorder_valid[12] <= reorder_valid[13];
+                reorder_valid[13] <= reorder_valid[14];
+                reorder_valid[14] <= reorder_valid[15];
+                /*
+                
 			for (i = 0; i < 15; i = i + 1) begin
 				reorder_values[i] <= reorder_values[i + 1];
 				reorder_registers[i] <= reorder_registers[i + 1];
 				reorder_valid[i] <= reorder_valid[i + 1];
 			end
+				*/
 			reorder_valid[15] <= 0;
 			current_reorder_pc <= current_reorder_pc + 1;
 		end
@@ -1101,10 +1188,29 @@ module inflight_registers(
 	reg reg_types [7:0];
 	
 	initial begin
+	    regs[0] = 0;
+	    regs[1] = 0;
+	    regs[2] = 0;
+	    regs[3] = 0;
+	    regs[4] = 0;
+	    regs[5] = 0;
+	    regs[6] = 0;
+	    regs[7] = 0;
+	    
+	    reg_types[0] = VALUE;
+	    reg_types[1] = VALUE;
+	    reg_types[2] = VALUE;
+	    reg_types[3] = VALUE;
+	    reg_types[4] = VALUE;
+	    reg_types[5] = VALUE;
+	    reg_types[6] = VALUE;
+	    reg_types[7] = VALUE;
+	    /*
 		for (i = 0; i < 8; i = i + 1) begin
 			reg_types[i] = VALUE;
 			regs[i] = 0;
 		end
+		*/
 	end
 
 	always @(*) begin
@@ -1167,9 +1273,19 @@ module committed_registers(
 	reg[3:0] i;
 	
 	initial begin
+	    regs[0] = 0;
+	    regs[1] = 0;
+	    regs[2] = 0;
+	    regs[3] = 0;
+	    regs[4] = 0;
+	    regs[5] = 0;
+	    regs[6] = 0;
+	    regs[7] = 0;
+	    /*
 		for (i = 0; i < 8; i = i + 1) begin
 			regs[i] = 0;
 		end
+		*/
 	end
 
 	always @(*) begin
