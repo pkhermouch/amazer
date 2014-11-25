@@ -368,7 +368,7 @@ always @(*) begin
 		claim_name = next_name;
 	end
 	if (next_source_0 == USE_PC) begin
-		src_1_input = next_pc + 1;
+		src_1_input = next_pc + 16'h1;
 		src_1_type = VALUE;
 	end else if (next_source_0 == USE_IMMEDIATE) begin
 		src_1_input = immediate_out;
@@ -379,7 +379,7 @@ always @(*) begin
 		src_1_type = reg_type_0;
 	end
 	if (next_source_1 == USE_PC) begin
-		src_2_input = next_pc + 1;
+		src_2_input = next_pc + 16'h1;
 		src_2_type = VALUE;
 	end else if (next_source_1 == USE_IMMEDIATE) begin
 		src_2_input = immediate_out;
@@ -393,7 +393,7 @@ always @(*) begin
 end
 
 always @(posedge clk) begin
-	next_name = next_name + 1;
+	next_name = next_name + 16'h1;
 end
 
 ///////////////////
@@ -402,6 +402,7 @@ end
 reg [15:0]debug;
 
 assign LEDR = fetch_pc[9:0];
+//assign LEDG = {reservationer_0_stall, reservationer_1_stall, reservationer_2_stall, 5'h0};
 assign LEDG = {reservationer_0_stall, reservationer_1_stall, reservationer_2_stall, 5'h0};
 
 display fjff(debug[15:12], HEX3);
@@ -486,15 +487,15 @@ module fetcher(clk, fetch_addr, pc_out, stall);
 	reg[15:0] next_fetch_pc;
 
 	initial begin
-		fetch_pc = -1;
-		temp_pc = -1;
+		fetch_pc = 16'hffff;
+		temp_pc = 16'hffff;
 	end
 
 	always @(*) begin
 		if(stall == 1) begin
 			next_fetch_pc = temp_pc;
 		end else begin
-			next_fetch_pc = temp_pc + 1;
+			next_fetch_pc = temp_pc + 16'h1;
 		end
 	end
 
@@ -900,30 +901,24 @@ module reorder_buffer(clk,
         reorder_valid[14] <= 0;
         reorder_valid[15] <= 0;
 
-       reorder_registers[0] <= 4'h8;
-               reorder_registers[1] <= 4'h8;
-                       reorder_registers[2] <= 4'h8;
-                               reorder_registers[3] <= 4'h8;
-                                       reorder_registers[4] <= 4'h8;
-                                               reorder_registers[5] <= 4'h8;
-                                                       reorder_registers[6] <= 4'h8;
-                                                               reorder_registers[7] <= 4'h8;
-                                                                       reorder_registers[8] <= 4'h8;
-                                                                               reorder_registers[9] <= 4'h8;
-                                                                                       reorder_registers[10] <= 4'h8;
-                                                                                               reorder_registers[11] <= 4'h8;
-                                                                                                       reorder_registers[12] <= 4'h8;
-                                                                                                               reorder_registers[13] <= 4'h8;
-                                                                                                                       reorder_registers[14] <= 4'h8;
-                                                                                                                               reorder_registers[15] <= 4'h8;
-                                                                                                                                       reorder_valid[16] <= 0;
-                                                                                                                                       /*                   
-		
-		for (i = 0; i < 16; i = i + 1) begin
-			reorder_registers[i] = 4'h8;
-			reorder_valid[i] = 0;
-		end
-        */
+		reorder_registers[0] <= 4'h8;
+		reorder_registers[1] <= 4'h8;
+		reorder_registers[2] <= 4'h8; 
+		reorder_registers[3] <= 4'h8;
+		reorder_registers[4] <= 4'h8; 
+		reorder_registers[5] <= 4'h8; 
+		reorder_registers[6] <= 4'h8;
+		reorder_registers[7] <= 4'h8; 
+		reorder_registers[8] <= 4'h8;
+		reorder_registers[9] <= 4'h8;
+		reorder_registers[10] <= 4'h8;
+		reorder_registers[11] <= 4'h8;
+		reorder_registers[12] <= 4'h8;
+		reorder_registers[13] <= 4'h8;
+		reorder_registers[14] <= 4'h8;
+		reorder_registers[15] <= 4'h8;
+																																												                  
+	
 	end
 	
 	always @(*) begin
@@ -1016,7 +1011,7 @@ module reorder_buffer(clk,
 			end
 				*/
 			reorder_valid[15] <= 0;
-			current_reorder_pc <= current_reorder_pc + 1;
+			current_reorder_pc <= current_reorder_pc + 16'h1;
 		end
 	
 	end
@@ -1086,7 +1081,7 @@ module reservationer(clk, pc_in, op_in, src1_in, src2_in, src1_type, src2_type, 
 		buffer_is_full = 1;
 		is_there_something_ready = 0;
 		stall_reg = 0;
-		for(i = 0; i < 16; i = i + 1) begin
+		for(i = 5'h0; i < 5'd16; i = i + 5'h1) begin
 			if(ops_buffer[i] == DO_NOP) begin
 				open_slot = i;
 				buffer_is_full = 0;
@@ -1122,8 +1117,8 @@ module reservationer(clk, pc_in, op_in, src1_in, src2_in, src1_type, src2_type, 
 			dest_buffer[open_slot] <= dest;//y
 			name_buffer[open_slot] <= name; //spree
 		end
-		for (i = 0; i < 16; i = i + 1) begin
-			for (j = 0; j < functional_unit_number; j = j + 1) begin
+		for (i = 5'h0; i < 5'd16; i = i + 5'h1) begin
+			for (j = 5'h0; j < functional_unit_number; j = j + 5'h1) begin
 				if (arg1_type_buffer[i] == NAME &&/*and*/all_names[16 * j+:16] == arg1_buffer[i]) begin
 					arg1_buffer[i] <= all_values[16 * j+:16];
 					arg1_type_buffer[i] <= VALUE;
@@ -1171,7 +1166,7 @@ module inflight_registers(
 	input[16 * write_port_number - 1:0] write_names;
 	input[16 * write_port_number - 1:0] write_values;
 
-	input[2:0] claim_addr;
+	input[3:0] claim_addr;
 	input[15:0] claim_name;
 
 	output[16 * read_port_number - 1:0] read_values;
@@ -1203,23 +1198,18 @@ module inflight_registers(
 	    reg_types[3] = VALUE;
 	    reg_types[4] = VALUE;
 	    reg_types[5] = VALUE;
-	    reg_types[6] = VALUE;
+	    reg_types[6] = NAME;
 	    reg_types[7] = VALUE;
-	    /*
-		for (i = 0; i < 8; i = i + 1) begin
-			reg_types[i] = VALUE;
-			regs[i] = 0;
-		end
-		*/
+
 	end
 
 	always @(*) begin
-		for (i = 0; i < read_port_number; i = i + 1) begin
+		for (i = 4'h0; i < read_port_number; i = i + 4'h1) begin
 			read_values_reg[16 * i+:16] = regs[read_addrs[3* i+:3]];
-			read_types_reg[i] = reg_types[i];
+			read_types_reg[i] = reg_types[];
 			// If we're getting a name, check if it just finished
 			if (reg_types[i] == NAME) begin
-				for (j = 0; j < write_port_number; j = j + 1) begin
+				for (j = 4'h0; j < write_port_number; j = j + 4'h1) begin
 					if (write_names[16 * j+:16] == regs[read_addrs[3* i+:3]]) begin
 						read_values_reg[16 * i+:16] = write_values[16 * j+:16];
 						read_types_reg[i] = VALUE;
@@ -1233,10 +1223,10 @@ module inflight_registers(
 	assign read_types = read_types_reg;
 
 	always @(posedge clk) begin
-		for (i = 0; i < 8; i = i + 1) begin
+		for (i = 4'h0; i < 4'h8; i = i + 4'h1) begin
 			// If there's a name in a reg, check if we got the value
 			if (reg_types[i] == NAME) begin
-				for (j = 0; j < write_port_number; j = j + 1) begin
+				for (j = 4'h0; j < write_port_number; j = j + 4'h1) begin
 					if (write_names[16 * j+:16] == regs[i]) begin
 						regs[i] <= write_values[16 * j+:16];
 						reg_types[i] <= VALUE;
@@ -1245,7 +1235,7 @@ module inflight_registers(
 			end
 		end
 		// If you are going to compute a register, then claim it
-		if (claim_addr != 7) begin
+		if (claim_addr != 4'h7) begin
 			regs[claim_addr] <= claim_name;
 			reg_types[claim_addr] <= NAME;
 		end
