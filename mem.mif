@@ -1,24 +1,14 @@
-Width=16;
-Depth=16;
+WIDTH=16;
+DEPTH=6;
 
 ADDRESS_RADIX=DEC;
 DATA_RADIX=HEX;
 
 CONTENT BEGIN
-	0: 01e1;
-	1: 02e2;
-	2: ae0a;
-	3: 03c4;
-	4: a560;
-	5: 00ed;
-	6: b805;
-	7: a804;
-	8: 0000;
-	9: 0000;
-	10: 0000;
-	11: 0000;
-	12: 0000;
-	13: 000a;
-	14: face;
-	15: ffff;
+0: 1121; -- for i from 1 to 6 do: sub ri ri i
+1: 1242;
+2: 1363;
+3: 1484;
+4: 15a5;
+5: 16c6;
 END;
