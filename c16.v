@@ -793,7 +793,7 @@ module memoreer(clk, pc_in,	operand_0, operand_1,
 			DO_LOAD: begin
 				mem_addr_out_reg = operand_0_reg + operand_1_reg;
 				start_stalin = 1;
-			end
+			end 
 			
 		endcase
 		
@@ -884,7 +884,7 @@ module reorder_buffer(clk,
 	initial begin
 		current_reorder_pc = 0;
 		for (i = 0; i < 16; i = i + 1) begin
-			reorder_registers[i] = 16'h8;
+			reorder_registers[i] = 4'h8;
 			reorder_valid[i] = 0;
 		end
 	end
@@ -906,17 +906,17 @@ module reorder_buffer(clk,
 	end 
 	
 	always @(posedge clk) begin
-		if (mather_0_register != 8) begin
+		if (mather_0_register != 7) begin
 			reorder_values[mather_0_index_reg] <= mather_0_value;
 			reorder_registers[mather_0_index_reg] <= mather_0_register;
 			reorder_valid[mather_0_index_reg] <= 1;
 		end
-		if (mather_1_register != 8) begin
+		if (mather_1_register != 7) begin
 			reorder_values[mather_1_index_reg] <= mather_1_value;
 			reorder_registers[mather_1_index_reg] <= mather_1_register;
 			reorder_valid[mather_0_index_reg] <= 1;
 		end
-		if (memoreer_0_register != 8) begin
+		if (memoreer_0_register != 7) begin
 			reorder_values[memoreer_0_index_reg] <= memoreer_0_value;
 			reorder_registers[memoreer_0_index_reg] <= memoreer_0_register;
 			reorder_valid[mather_0_index_reg] <= 1;
