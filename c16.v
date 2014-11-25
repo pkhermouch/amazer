@@ -94,8 +94,8 @@ wire [15:0] writeout_value;
 wire [15:0] writeout_enable;
 
 // Used to reserve what you are computing
-wire [15:0] claim_name;
-wire [3:0] claim_addr;
+reg [15:0] claim_name;
+reg [3:0] claim_addr;
 
 committed_registers a(
 	.clk(clk),
@@ -363,27 +363,31 @@ always @(*) begin
 		reservationer_1_op = next_op;
 	end
 
-	if (next_source_0 == USE_PC) begin
-		src_2_input = next_pc + 1;
-		src_2_type = VALUE;
-	end else if (next_source_0 == USE_IMMEDIATE) begin
-		src_2_input = immediate_out;
-		src_2_type = VALUE;
-	end else begin
-		reg_addr_0 = next_source_0[2:0];
-		src_2_input = reg_value_0;
-		src_2_type = reg_type_0;
+	if (next_op != DO_NOP) begin
+		claim_addr = next_dest;
+		claim_name = next_name;
 	end
-	if (next_source_1 == USE_PC) begin
+	if (next_source_0 == USE_PC) begin
 		src_1_input = next_pc + 1;
 		src_1_type = VALUE;
-	end else if (next_source_1 == USE_IMMEDIATE) begin
+	end else if (next_source_0 == USE_IMMEDIATE) begin
 		src_1_input = immediate_out;
 		src_1_type = VALUE;
 	end else begin
+		reg_addr_0 = next_source_0[2:0];
+		src_1_input = reg_value_0;
+		src_1_type = reg_type_0;
+	end
+	if (next_source_1 == USE_PC) begin
+		src_2_input = next_pc + 1;
+		src_2_type = VALUE;
+	end else if (next_source_1 == USE_IMMEDIATE) begin
+		src_2_input = immediate_out;
+		src_2_type = VALUE;
+	end else begin
 		reg_addr_1 = next_source_1[2:0];
-		src_1_input = reg_value_1;
-		src_1_type = reg_type_1;
+		src_2_input = reg_value_1;
+		src_2_type = reg_type_1;
 	end
 
 end
@@ -407,12 +411,54 @@ display jj(debug[3:0], HEX0);
 
 //do we display? no
 always @(*) begin
+	debug = 0;
 	if (SW[9]) begin
 		debug = instruction;
+		if (SW[8])
+			debug = {1'b0, next_op, next_source_0, next_source_1, 1'b0, next_dest};
+		else if (SW[7])
+			debug = immediate_out;
 	end else if (SW[8]) begin
+		debug = {1'b0, reservationer_0_op, 1'b0, reservationer_1_op, 1'b0, reservationer_2_op};
+		if (SW[7]) begin
+			debug = {1'b0, next_dest, 7'b0, src_1_type, 3'b0, src_2_type};
+			if (SW[2])
+				debug = next_name;
+			else if (SW[1])
+				debug = src_1_input;
+			else if (SW[0])
+				debug = src_2_input;
+			end
 	end else if (SW[7]) begin
+		debug = {5'b0, mather_0_operation, 1'b0, mather_0_dest_in, 1'b0, mather_0_dest_out};
+		if (SW[3])
+			debug = mather_0_result;
+		else if (SW[2])
+			debug = mather_0_name_in;
+		else if (SW[1])
+			debug = mather_0_operand_1;
+		else if (SW[0])
+			debug = mather_0_operand_0;
 	end else if (SW[6]) begin
+		debug = {5'b0, mather_1_operation, 1'b0, mather_1_dest_in, 1'b0, mather_1_dest_out};
+		if (SW[3])
+			debug = mather_1_result;
+		else if (SW[2])
+			debug = mather_1_name_in;
+		else if (SW[1])
+			debug = mather_1_operand_1;
+		else if (SW[0])
+			debug = mather_1_operand_0;
 	end else if (SW[5]) begin
+		debug = {5'b0, memoreer_0_operation, 1'b0, memoreer_0_dest_in, 1'b0, memoreer_0_dest_out};
+		if (SW[3])
+			debug = memoreer_0_result;
+		else if (SW[2])
+			debug = memoreer_0_name_in;
+		else if (SW[1])
+			debug = memoreer_0_operand_1;
+		else if (SW[0])
+			debug = memoreer_0_operand_0;
 	end else if (SW[4]) begin
 		if(SW[3])
 			debug = in_flight_dbg;
