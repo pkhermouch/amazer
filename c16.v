@@ -862,6 +862,7 @@ module memoreer(clk, pc_in,	operand_0, operand_1,
 			destination_out_reg <= destination_save;
 			name_out_reg <= name_save;
 			pc_out_reg <= pc_save;
+			result_save <= load_value;
 		end
 		pc_in_reg <= pc_in;
 		name_in_reg <= name_in;
