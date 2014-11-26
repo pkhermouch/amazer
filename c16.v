@@ -158,7 +158,7 @@ wire memory_wren;
 wire [15:0] memory_value_in;
 wire [15:0] memory_value_out;
 
-ram2 d (
+ram2 ddd (
 	.address_a(instruction_addr),
 	.address_b(memoreer_addr),
 	.clock(clk),
@@ -177,7 +177,6 @@ wire [3:0] next_source_1;
 wire [15:0] next_pc;
 wire [2:0] next_dest;
 wire [15:0] immediate_out;
-wire memoreer_0_done;
 
 decoder_uno e(
 	.clk(clk),
@@ -237,7 +236,6 @@ memoreer h(
 	.load_value(memory_value_out),
 	.result(memoreer_0_result),
 	.pc_out(memoreer_0_pc_out),
-	.done(memoreer_0_done),
 	.name_in(memoreer_0_name_in),
 	.name_out(memoreer_0_name_out)
 	);
@@ -427,6 +425,10 @@ always @(*) begin
 			debug = writeout_value;
 		else if (SW[4])
 			debug = writeout_pc;
+		else if (SW[3])
+			debug = memoreer_addr;
+		else if (SW[2])
+			debug = memory_value_out;
 	end else if (SW[8]) begin
 		debug = {1'b0, reservationer_0_op, 1'b0, reservationer_1_op, 1'b0, reservationer_2_op};
 		if (SW[7]) begin
@@ -456,7 +458,7 @@ always @(*) begin
 			if (SW[0])
 				debug = mather_0_operand_1;
 			else
-				debug = mather_0_operand_1;
+				debug = mather_0_operand_0;
 		end
 	end else if (SW[6]) begin
 		debug = {5'b0, mather_1_operation, 1'b0, mather_1_dest_in,  mather_1_dest_out};
@@ -476,7 +478,7 @@ always @(*) begin
 			if (SW[0])
 				debug = mather_1_operand_1;
 			else
-				debug = mather_1_operand_1;
+				debug = mather_1_operand_0;
 		end
 	end else if (SW[5]) begin
 		debug = {5'b0, memoreer_0_operation, 1'b0, memoreer_0_dest_in,  memoreer_0_dest_out};
@@ -496,7 +498,7 @@ always @(*) begin
 			if (SW[0])
 				debug = memoreer_0_operand_1;
 			else
-				debug = memoreer_0_operand_1;
+				debug = memoreer_0_operand_0;
 		end
 	end else if (SW[4]) begin
 		if(SW[3])
@@ -785,7 +787,7 @@ endmodule
 
 module memoreer(clk, pc_in,	operand_0, operand_1,
 	operation, 	destination_in,	destination_out, 	mem_addr_out,
-	mem_wren, 	load_value,	result,	pc_out, done, name_in, name_out);
+	mem_wren, 	load_value,	result,	pc_out, name_in, name_out);
 
 	parameter DO_LOAD= 3'h2;
 	parameter DO_NOP  =3'h4; 
@@ -805,8 +807,6 @@ module memoreer(clk, pc_in,	operand_0, operand_1,
 	output [15:0] name_out;	
 	output mem_wren;
 
-	output done;
-
 	reg [15:0] pc_in_reg;
 	reg [15:0] name_in_reg;
 	reg [15:0] operand_0_reg;
@@ -821,13 +821,14 @@ module memoreer(clk, pc_in,	operand_0, operand_1,
 
 	reg [15:0] result_save;
 	reg [15:0] pc_save;
+	reg [15:0] pc_out_reg;
 	reg [15:0] name_save;
-	reg [3:0]  destination_save = 8;
-	reg done_reg;
-	reg [3:0]  operation_save;
+	reg [15:0] name_out_reg;
+	reg [3:0] destination_save = 8;
+	reg [3:0] destination_out_reg = 8;
+	reg [3:0] operation_save;
 	
 	initial begin
-		done_reg = 0;
 		cycles_we_have_stalled = 72;
 	end
 
@@ -845,6 +846,9 @@ module memoreer(clk, pc_in,	operand_0, operand_1,
 	end
 
 	always @(posedge clk) begin
+		destination_out_reg <= 8;
+		name_out_reg <= 0;
+		pc_out_reg <= 0;
 		if (start_stalin == 1) begin
 			cycles_we_have_stalled <= 0;
 			pc_save <= pc_in_reg;
@@ -855,14 +859,9 @@ module memoreer(clk, pc_in,	operand_0, operand_1,
 			cycles_we_have_stalled <= cycles_we_have_stalled + 1;
 		end
 		if(cycles_we_have_stalled == 2) begin
-			done_reg <= 1;
-			if (operation_save == DO_LOAD) begin
-				result_save <= load_value;
-			end else begin
-				destination_save <= 8;
-			end
-		end else begin
-			done_reg <= 0;
+			destination_out_reg <= destination_save;
+			name_out_reg <= name_save;
+			pc_out_reg <= pc_save;
 		end
 		pc_in_reg <= pc_in;
 		name_in_reg <= name_in;
@@ -873,10 +872,9 @@ module memoreer(clk, pc_in,	operand_0, operand_1,
 	end
 	
 	assign mem_addr_out = mem_addr_out_reg;
-	assign destination_out = destination_save;
-	assign done = done_reg;
-	assign pc_out = pc_save;
-	assign name_out = name_save;
+	assign destination_out = destination_out_reg;
+	assign pc_out = pc_out_reg;
+	assign name_out = name_out_reg;
 	assign result = result_save;
 	assign mem_wren = mem_wren_reg;
 endmodule
@@ -978,9 +976,9 @@ module reorder_buffer(clk,
 			writeout_value_reg = 0;
 		end
 		
-		mather_0_index_reg = mather_0_pc - current_reorder_pc;
-		mather_1_index_reg = mather_1_pc - current_reorder_pc;
-		memoreer_0_index_reg = memoreer_0_pc - current_reorder_pc;
+		mather_0_index_reg = mather_0_pc - next_reorder_pc;
+		mather_1_index_reg = mather_1_pc - next_reorder_pc;
+		memoreer_0_index_reg = memoreer_0_pc - next_reorder_pc;
 	end 
 	
 	always @(posedge clk) begin
@@ -1052,12 +1050,12 @@ module reorder_buffer(clk,
 		if (mather_1_register != 8) begin
 			reorder_values[mather_1_index_reg] <= mather_1_value;
 			reorder_registers[mather_1_index_reg] <= mather_1_register;
-			reorder_valid[mather_0_index_reg] <= 1;
+			reorder_valid[mather_1_index_reg] <= 1;
 		end
 		if (memoreer_0_register != 8) begin
 			reorder_values[memoreer_0_index_reg] <= memoreer_0_value;
 			reorder_registers[memoreer_0_index_reg] <= memoreer_0_register;
-			reorder_valid[mather_0_index_reg] <= 1;
+			reorder_valid[memoreer_0_index_reg] <= 1;
 		end
 	end
 
