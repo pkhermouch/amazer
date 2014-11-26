@@ -154,7 +154,6 @@ fetcher c(
 	);
 
 wire [15:0] memoreer_addr;
-wire memory_wren;
 wire [15:0] memory_value_in;
 wire [15:0] memory_value_out;
 
@@ -165,7 +164,7 @@ ram2 ddd (
 	.data_a(0),
 	.data_b(memory_value_in),
 	.wren_a(0),
-	.wren_b(memory_wren),
+	.wren_b(0),
 	.q_a(instruction),
 	.q_b(memory_value_out) // value out for load instructions NOPE
  	);
@@ -232,7 +231,6 @@ memoreer h(
 	.destination_in(memoreer_0_dest_in), // E 
 	.destination_out(memoreer_0_dest_out),
 	.mem_addr_out(memoreer_addr),
-	.mem_wren(memory_wren),
 	.load_value(memory_value_out),
 	.result(memoreer_0_result),
 	.pc_out(memoreer_0_pc_out),
@@ -306,13 +304,13 @@ reservationer  #(3)sazvdc (
 
 	reorder_buffer i( 
 	.clk(clk), 
-	.mather_0_pc(mather_0_pc_out), 
+	.mather_0_pc(fetch_pc == 16'hffff ? 16'hffff : mather_0_pc_out), 
 	.mather_0_register(mather_0_dest_out), 
 	.mather_0_value(mather_0_result), 
-	.mather_1_pc(mather_1_pc_out), 
+	.mather_1_pc(fetch_pc == 16'hffff ? 16'hffff : mather_1_pc_out), 
 	.mather_1_register(mather_1_dest_out), 
 	.mather_1_value(mather_1_result),
-	.memoreer_0_pc(memoreer_0_pc_out), 
+	.memoreer_0_pc(fetch_pc == 16'hffff ? 16'hffff : memoreer_0_pc_out), 
 	.memoreer_0_register(memoreer_0_dest_out), 
 	.memoreer_0_value(memoreer_0_result), 
 	.writeout_register(writeout_register), 
@@ -787,7 +785,7 @@ endmodule
 
 module memoreer(clk, pc_in,	operand_0, operand_1,
 	operation, 	destination_in,	destination_out, 	mem_addr_out,
-	mem_wren, 	load_value,	result,	pc_out, name_in, name_out);
+		load_value,	result,	pc_out, name_in, name_out);
 
 	parameter DO_LOAD= 3'h2;
 	parameter DO_NOP  =3'h4; 
@@ -805,79 +803,71 @@ module memoreer(clk, pc_in,	operand_0, operand_1,
 	output [15:0] result;
 	output [15:0] pc_out;	
 	output [15:0] name_out;	
-	output mem_wren;
 
-	reg [15:0] pc_in_reg;
-	reg [15:0] name_in_reg;
+	reg [15:0] pc_regs [3:0];
+	reg [15:0] name_regs [3:0];
 	reg [15:0] operand_0_reg;
 	reg [15:0] operand_1_reg;
-	reg [3:0]  operation_reg;
-	reg [3:0]  destination_in_reg = 8;
+	reg [3:0]  operation_regs [3:0];
+	reg [3:0]  destination_regs [3:0];
 	
 	reg [15:0] mem_addr_out_reg;
-	reg [31:0] cycles_we_have_stalled;
-	reg start_stalin;
-	reg mem_wren_reg;
-
 	reg [15:0] result_save;
-	reg [15:0] pc_save;
-	reg [15:0] pc_out_reg;
-	reg [15:0] name_save;
-	reg [15:0] name_out_reg;
-	reg [3:0] destination_save = 8;
-	reg [3:0] destination_out_reg = 8;
-	reg [3:0] operation_save;
 	
 	initial begin
-		cycles_we_have_stalled = 72;
+		operation_regs[0] = DO_NOP;
+		operation_regs[1] = DO_NOP;
+		operation_regs[2] = DO_NOP;
+		operation_regs[3] = DO_NOP;
+		pc_regs[3] = 16'hffff;
+		name_regs[3] = 0;
+		destination_regs[3] = 8;
 	end
 
 	always @(*) begin
-		mem_wren_reg = 0;
-		start_stalin = 0;
-		case(operation_reg)
-			DO_LOAD: begin
-				mem_addr_out_reg = operand_0_reg + operand_1_reg;
-				start_stalin = 1;
-			end 
-			
-		endcase
-		
+		mem_addr_out_reg = operand_0_reg + operand_1_reg;
 	end
 
+	assign mem_addr_out = mem_addr_out_reg;
+	
 	always @(posedge clk) begin
-		destination_out_reg <= 8;
-		name_out_reg <= 0;
-		pc_out_reg <= 0;
-		if (start_stalin == 1) begin
-			cycles_we_have_stalled <= 0;
-			pc_save <= pc_in_reg;
-			name_save <= name_in_reg;
-			operation_save <= operation_reg;
-			destination_save <= destination_in_reg;
-		end else begin
-			cycles_we_have_stalled <= cycles_we_have_stalled + 1;
-		end
-		if(cycles_we_have_stalled == 2) begin
-			destination_out_reg <= destination_save;
-			name_out_reg <= name_save;
-			pc_out_reg <= pc_save;
-			result_save <= load_value;
-		end
-		pc_in_reg <= pc_in;
-		name_in_reg <= name_in;
+		pc_regs[0] <= pc_in;
+		name_regs[0] <= name_in;
 		operand_0_reg <= operand_0;
 		operand_1_reg <= operand_1;
-		operation_reg <= operation;
-		destination_in_reg <= destination_in;
+		operation_regs[0] <= operation;
+		destination_regs[0] <= destination_in;
+		
+		// Saved when talking to memory
+		pc_regs[1] <= pc_regs[0];
+		name_regs[1] <= name_regs[0];
+		operation_regs[1] <= operation_regs[0];
+		destination_regs[1] <= destination_regs[0];
+		
+		// Saved while memory works
+		pc_regs[2] <= pc_regs[1];
+		name_regs[2] <= name_regs[1];
+		operation_regs[2] <= operation_regs[1];
+		destination_regs[2] <= destination_regs[1];
+		
+		// Things to expose in the last cycle
+		operation_regs[3] <= operation_regs[2];
+		if (operation_regs[2] == DO_NOP) begin
+			pc_regs[3] <= 16'hffff;
+			name_regs[3] <= 0;
+			destination_regs[3] <= 8;
+		end else begin
+			pc_regs[3] <= pc_regs[2];
+			name_regs[3] <= name_regs[2];
+			destination_regs[3] <= destination_regs[2];
+		end
+		result_save <= load_value;
 	end
 	
-	assign mem_addr_out = mem_addr_out_reg;
-	assign destination_out = destination_out_reg;
-	assign pc_out = pc_out_reg;
-	assign name_out = name_out_reg;
+	assign destination_out = destination_regs[3];
+	assign pc_out = pc_regs[3];
+	assign name_out = name_regs[3];
 	assign result = result_save;
-	assign mem_wren = mem_wren_reg;
 endmodule
 
 ////////////////////
