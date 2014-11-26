@@ -1,5 +1,5 @@
 Our design is separated into stages much like p9, with the major differences
-that the D1 stage sets up the names/values of an instructions destination
+that the D1 stage sets up the names/values of an instruction's destination
 and operands, and the writeback of each functional unit goes into the reorder
 buffer rather than the committed registers directly.
 
@@ -31,7 +31,7 @@ Execute (variable length):
 --------------------------
 Each functional unit takes its operands and operation and then some number of
 cycles later it latches all of its output values to be exposed to the writeback
-stage.
+stage. All of the functional units are pipelined.
 
 Writeback:
 ----------
@@ -46,10 +46,18 @@ for the commit stage.
 Commit:
 -------
 The reorder buffer stores instruction results in a series of shift registers
-which order the results based on their pc. Once the instruction with the next
+which order the results based on their pc, relative to the pc of the next
+instruction that must be committed. Once the instruction with the next
 committable pc is in the reorder buffer, the value of the next committable pc is
 incremented and all of the elements of the buffer are shifted down.
 
 Board I/O
 =========
-TODO what do switches do?
+How to view each of the following:
+Committed registers -- SW[4-9] off, SW[3] on, SW[2-0] selects the register number
+In flight register values -- SW[5-9] off, SW[4-3] on, SW[2-0] selects the register number
+In flight register meaning -- SW[5-9] and SW[3] off, SW[4] on, SW[2-0] selects the
+  register number (1 means value, 0 means name, i.e. the value is coming from the result of
+  another instruction)
+PC of the next instruction that will be committed, when the value arrives -- SW[9], SW[4]
+  on, all other switches off
