@@ -444,23 +444,399 @@ end
 
 endmodule
 
+module ascii(clk, mem_addr, mem_value,
+  x, y, r, g, b );
 
+output[15:0] mem_addr;
+output[7:0] r;
+output[7:0] g;
+output[7:0] b;
 
+input[15:0] mem_value;
+input[11:0] x;
+input[11:0] y;
 
+wire [7:0] row = y[11:4];
+wire [7:0] col = x[11:4];
+wire [4:0] x_off = x[3:0];
+wire [4:0] y_off = y[3:0];
 
+reg [39:0] ascii_mask;
+reg set;
 
+always @(*) begin
+  mem_addr = row * 80 + col;
+  if (x_off == 0 || x_off > 5) begin
+    set = 0;
+  end else begin
+    set = ascii_mark[y_off * 5 + x_off];
+  end
+end
 
+always @(*) begin
+  case (mem_value)
+    16'h20: begin // space
+    ascii_mark = {40'h0};
+    end
+    16'h21: begin // !
+    ascii_mark = {
+      5'h0,
+      5'b00100,
+      5'b00100,
+      5'b00100,
+      5'b00100,
+      5'b00100,
+      5'b00000,
+      5'b00100
+      };
+    end
+    16'h22: begin // "
+    end
+    16'h23: begin // #
+    end
+    16'h24: begin // $
+    end
+    16'h25: begin // %
+    end
+    16'h26: begin // &
+    end
+    16'h27: begin // '
+    ascii_mark = {
+      5'h0,
+      5'b00100,
+      5'b00100,
+      5'b00000,
+      5'b00000,
+      5'b00000,
+      5'b00000,
+      5'b00000
+      };
+    end
+    16'h28: begin // (
+    end
+    16'h29: begin // )
+    end
+    16'h2A: begin // *
+    end
+    16'h2B: begin // +
+    end
+    16'h2C: begin // ,
+    end
+    16'h2D: begin // -
+    ascii_mark = {
+      5'h0,
+      5'b00000,
+      5'b00000,
+      5'b00000,
+      5'b11111,
+      5'b00000,
+      5'b00000,
+      5'b00000
+      };
+    end
+    16'h2E: begin // .
+    ascii_mark = {
+      5'h0,
+      5'b00000,
+      5'b00000,
+      5'b00000,
+      5'b00000,
+      5'b00000,
+      5'b00000,
+      5'b00100
+      };
+    end
+    16'h2F: begin // /
+    end
+    16'h30: begin // 0
+    ascii_mark = {
+      5'h0,
+      5'b01110,
+      5'b10001,
+      5'b10011,
+      5'b10101,
+      5'b11001,
+      5'b10001,
+      5'b01110
+      };
+    end
+    16'h31: begin // 1
+    ascii_mark = {
+      5'h0,
+      5'b00100,
+      5'b01100,
+      5'b00100,
+      5'b00100,
+      5'b00100,
+      5'b00100,
+      5'b01110
+      };
+    end
+    16'h32: begin // 2
+    ascii_mark = {
+      5'h0,
+      5'b01110,
+      5'b10001,
+      5'b00001,
+      5'b00110,
+      5'b01000,
+      5'b10000,
+      5'b11111
+      };
+    end
+    16'h33: begin // 3
+    ascii_mark = {
+      5'h0,
+      5'b11111,
+      5'b00001,
+      5'b00010,
+      5'b00110,
+      5'b00001,
+      5'b10001,
+      5'b01110
+      };
+    end
+    16'h34: begin // 4
+    ascii_mark = {
+      5'h0,
+      5'b00010,
+      5'b00110,
+      5'b01010,
+      5'b10010,
+      5'b11111,
+      5'b00010,
+      5'b00010
+      };
+    end
+    16'h35: begin // 5
+    ascii_mark = {
+      5'h0,
+      5'b11111,
+      5'b10000,
+      5'b11110,
+      5'b00001,
+      5'b00001,
+      5'b10001,
+      5'b01110
+      };
+    end
+    16'h36: begin // 6
+    ascii_mark = {
+      5'h0,
+      5'b00111,
+      5'b01000,
+      5'b10000,
+      5'b11110,
+      5'b10001,
+      5'b10001,
+      5'b01110
+      };
+    end
+    16'h37: begin // 7
+    ascii_mark = {
+      5'h0,
+      5'b11111,
+      5'b00001,
+      5'b00010,
+      5'b00100,
+      5'b01000,
+      5'b01000,
+      5'b01000
+      };
+    end
+    16'h38: begin // 8
+    ascii_mark = {
+      5'h0,
+      5'b01110,
+      5'b10001,
+      5'b10001,
+      5'b01110,
+      5'b10001,
+      5'b10001,
+      5'b01110
+      };
+    end
+    16'h39: begin // 9
+    ascii_mark = {
+      5'h0,
+      5'b01110,
+      5'b10001,
+      5'b10001,
+      5'b01111,
+      5'b00001,
+      5'b00010,
+      5'b11110
+      };
+    end
+    16'h3A: begin // :
+    end
+    16'h3B: begin // ;
+    end
+    16'h3C: begin // <
+    end
+    16'h3D: begin // =
+    ascii_mark = {
+      5'h0,
+      5'b00000,
+      5'b00000,
+      5'b11111,
+      5'b00000,
+      5'b11111,
+      5'b00000,
+      5'b00000
+      };
+    end
+    16'h3E: begin // >
+    end
+    16'h3F: begin // ?
+    end
+    16'h40: begin // @
+    end
+    16'h41: begin // A
+    end
+    16'h42: begin // B
+    end
+    16'h43: begin // C
+    end
+    16'h44: begin // D
+    end
+    16'h45: begin // E
+    end
+    16'h46: begin // F
+    end
+    16'h47: begin // G
+    end
+    16'h48: begin // H
+    end
+    16'h49: begin // I
+    end
+    16'h4A: begin // J
+    end
+    16'h4B: begin // K
+    end
+    16'h4C: begin // L
+    end
+    16'h4D: begin // M
+    end
+    16'h4E: begin // N
+    end
+    16'h4F: begin // O
+    end
+    16'h50: begin // P
+    end
+    16'h51: begin // Q
+    end
+    16'h52: begin // R
+    end
+    16'h53: begin // S
+    end
+    16'h54: begin // T
+    end
+    16'h55: begin // U
+    end
+    16'h56: begin // V
+    end
+    16'h57: begin // W
+    end
+    16'h58: begin // X
+    end
+    16'h59: begin // Y
+    end
+    16'h5A: begin // Z
+    end
+    16'h5B: begin // [
+    end
+    16'h5C: begin // \
+    end
+    16'h5D: begin // ]
+    end
+    16'h5E: begin // ^
+    end
+    16'h5F: begin // _
+    ascii_mark = {
+      5'h0,
+      5'b00000,
+      5'b00000,
+      5'b00000,
+      5'b00000,
+      5'b00000,
+      5'b00000,
+      5'b11111
+      };
+    end
+    16'h60: begin // `
+    end
+    16'h61: begin // a
+    end
+    16'h62: begin // b
+    end
+    16'h63: begin // c
+    end
+    16'h64: begin // d
+    end
+    16'h65: begin // e
+    end
+    16'h66: begin // f
+    end
+    16'h67: begin // g
+    end
+    16'h68: begin // h
+    end
+    16'h69: begin // i
+    end
+    16'h6A: begin // j
+    end
+    16'h6B: begin // k
+    end
+    16'h6C: begin // l
+    end
+    16'h6D: begin // m
+    end
+    16'h6E: begin // n
+    end
+    16'h6F: begin // o
+    end
+    16'h70: begin // p
+    end
+    16'h71: begin // q
+    end
+    16'h72: begin // r
+    end
+    16'h73: begin // s
+    end
+    16'h74: begin // t
+    end
+    16'h75: begin // u
+    end
+    16'h76: begin // v
+    end
+    16'h77: begin // w
+    end
+    16'h78: begin // x
+    end
+    16'h79: begin // y
+    end
+    16'h7A: begin // z
+    end
+    16'h7B: begin // {
+    end
+    16'h7C: begin // |
+    end
+    16'h7D: begin // }
+    end
+    16'h7E: begin // ~
+    end
+    endcase
+  end
 
-
-
-
+endmodule
 
 /////////////////////////
 // 7 SEG               //
 /////////////////////////
 module display(NUM, HEX);
 	input[3:0] NUM;
-	
+
 	output[6:0] HEX;
 	reg[6:0] HEX;
 
@@ -483,4 +859,135 @@ module display(NUM, HEX);
 		4'hE : HEX = 7'b0000110;
 		4'hF : HEX = 7'b0001110;
 	endcase
+endmodule
+
+////////////////////////////
+// HDMI MODULE FROM CHRIS //
+////////////////////////////
+module hdmi(
+    clock25, resetn,
+    x, y,
+    r, g, b,
+
+    //////////// HDMI-TX //////////
+    HDMI_TX_CLK,
+    HDMI_TX_D,
+    HDMI_TX_DE,
+    HDMI_TX_HS,
+    HDMI_TX_INT,
+    HDMI_TX_VS
+);
+
+parameter WIDTH = 640;
+parameter HEIGHT = 480;
+parameter XDIV = 1;
+parameter YDIV = 1;
+parameter XSTART = 0;
+parameter XEND = XSTART + XDIV*WIDTH;
+parameter YSTART = 0;
+parameter YEND = YSTART + YDIV*HEIGHT;
+
+parameter HSIZE = 640;
+parameter VSIZE = 480;
+parameter HTOTAL = 800;
+parameter VTOTAL = 525;
+parameter HSTART = 141;
+parameter HEND = HSTART + HSIZE;
+parameter VSTART = 34;
+parameter VEND = VSTART + VSIZE;
+
+input clock25;
+input resetn;
+output reg [11:0] x;
+output reg [11:0] y;
+input [7:0] r;
+input [7:0] g;
+input [7:0] b;
+
+output HDMI_TX_CLK = clock25;
+output [23:0] HDMI_TX_D = hdmi_data;
+output HDMI_TX_DE = hdmi_de[1];
+output HDMI_TX_HS = hdmi_hsync;
+output HDMI_TX_VS = hdmi_vsync;
+input HDMI_TX_INT;
+
+
+reg [23:0] hdmi_data;
+reg [1:0] hdmi_de;
+
+reg [11:0] hdmi_hcount;
+reg [11:0] hdmi_vcount;
+wire hdmi_hactive = hdmi_hcount >= HSTART && hdmi_hcount < HEND;
+wire hdmi_vactive = hdmi_vcount >= VSTART && hdmi_vcount < VEND;
+wire hdmi_active = hdmi_hactive && hdmi_vactive;
+wire hdmi_hsync = hdmi_hcount >= HEND;
+wire hdmi_vsync = hdmi_vcount >= VEND;
+
+always @(posedge clock25 or negedge resetn) begin
+    if (!resetn) begin
+        hdmi_de <= 0;
+        hdmi_hcount <= 0;
+        hdmi_vcount <= 0;
+    end else begin
+        hdmi_de[1] <= hdmi_de[0];
+        hdmi_de[0] <= hdmi_active;
+
+        if (hdmi_hcount + 1'b1 == HTOTAL) begin
+            hdmi_hcount <= 0;
+
+            if (hdmi_vcount + 1'b1 == VTOTAL) begin
+                hdmi_vcount <= 0;
+            end else begin
+                hdmi_vcount <= hdmi_vcount + 1'b1;
+            end
+        end else begin
+            hdmi_hcount <= hdmi_hcount + 1'b1;
+        end
+    end
+end
+
+
+wire xactive = hdmi_hcount >= HSTART+XSTART && hdmi_hcount < HSTART+XEND;
+wire yactive = hdmi_vcount >= VSTART+YSTART && hdmi_vcount < VSTART+YEND;
+
+reg [$clog2(XDIV)-1:0] xcount;
+reg [$clog2(YDIV)-1:0] ycount;
+
+always @(posedge clock25 or negedge resetn) begin
+    if (!resetn) begin
+        hdmi_data <= 0;
+        xcount <= 0;
+        x <= 0;
+        ycount <= 0;
+        y <= 0;
+    end else begin
+        if (xactive && yactive) begin
+            hdmi_data <= {r, g, b};
+
+            if (xcount + 1'b1 == XDIV) begin
+                xcount <= 0;
+                if (x + 1'b1 == WIDTH) begin
+                    x <= 0;
+                    if (ycount + 1'b1 == YDIV) begin
+                        ycount <= 0;
+                        if (y + 1'b1 == HEIGHT) begin
+                            y <= 0;
+                        end else begin
+                            y <= y + 1'b1;
+                        end
+                    end else begin
+                        ycount <= ycount + 1'b1;
+                    end
+                end else begin
+                    x <= x + 1'b1;
+                end
+            end else begin
+                xcount <= xcount + 1'b1;
+            end
+        end else begin
+            hdmi_data <= 0;
+        end
+    end
+end
+
 endmodule
