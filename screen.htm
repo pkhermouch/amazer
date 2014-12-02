@@ -5,6 +5,8 @@
 <br />
 <h2 align="left">Pin Assignments:</h2>
 <ul>
+<a href="#CLOCK"><li>CLOCK</li></a>
+<br />
 <a href="#LED"><li>LED</li></a>
 <br />
 <a href="#KEY"><li>KEY</li></a>
@@ -13,11 +15,56 @@
 <br />
 <a href="#SEG7"><li>SEG7</li></a>
 <br />
+<a href="#HDMI-TX"><li>HDMI-TX</li></a>
+<br />
+<a href="#I2C for Audio/HDMI-TX/Si5338/HSMC"><li>I2C for Audio/HDMI-TX/Si5338/HSMC</li></a>
+<br />
 </ul>
 <br />
 <br />
 <br />
 <h2 align="left">Pin Assignment Table:</h2>
+<h2><a name="CLOCK"></a></h2><table border="3">
+<caption  align="left">CLOCK</caption>
+<br />
+<br />
+<tr>
+   <th align="left" bgcolor="Khaki">Name</th>
+   <th align="left" bgcolor="Khaki">Location</th>
+   <th align="left" bgcolor="Khaki">Direction</th>
+   <th align="left" bgcolor="Khaki">Standard</th>
+</tr>
+<tr>
+   <td align="left">CLOCK_125_p</td>
+   <td align="left">U12</td>
+   <td align="left">input </td>
+   <td align="left">LVDS</td>
+</tr>
+<tr>
+   <td align="left">CLOCK_50_B5B</td>
+   <td align="left">R20</td>
+   <td align="left">input </td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">CLOCK_50_B6A</td>
+   <td align="left">N20</td>
+   <td align="left">input </td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">CLOCK_50_B7A</td>
+   <td align="left">H12</td>
+   <td align="left">input </td>
+   <td align="left">2.5 V</td>
+</tr>
+<tr>
+   <td align="left">CLOCK_50_B8A</td>
+   <td align="left">M10</td>
+   <td align="left">input </td>
+   <td align="left">2.5 V</td>
+</tr>
+</table>
 <h2><a name="LED"></a></h2><table border="3">
 <caption  align="left">LED</caption>
 <br />
@@ -426,6 +473,214 @@
    <td align="left">AC22</td>
    <td align="left">output</td>
    <td align="left">3.3-V LVTTL</td>
+</tr>
+</table>
+<h2><a name="HDMI-TX"></a></h2><table border="3">
+<caption  align="left">HDMI-TX</caption>
+<br />
+<br />
+<tr>
+   <th align="left" bgcolor="Khaki">Name</th>
+   <th align="left" bgcolor="Khaki">Location</th>
+   <th align="left" bgcolor="Khaki">Direction</th>
+   <th align="left" bgcolor="Khaki">Standard</th>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_HS</td>
+   <td align="left">U26</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_VS</td>
+   <td align="left">U25</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_CLK</td>
+   <td align="left">Y25</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_DE</td>
+   <td align="left">Y26</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_INT</td>
+   <td align="left">T12</td>
+   <td align="left">input </td>
+   <td align="left">1.2 V</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[0]</td>
+   <td align="left">V23</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[1]</td>
+   <td align="left">AA26</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[2]</td>
+   <td align="left">W25</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[3]</td>
+   <td align="left">W26</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[4]</td>
+   <td align="left">V24</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[5]</td>
+   <td align="left">V25</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[6]</td>
+   <td align="left">U24</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[7]</td>
+   <td align="left">T23</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[8]</td>
+   <td align="left">T24</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[9]</td>
+   <td align="left">T26</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[10]</td>
+   <td align="left">R23</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[11]</td>
+   <td align="left">R25</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[12]</td>
+   <td align="left">P22</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[13]</td>
+   <td align="left">P23</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[14]</td>
+   <td align="left">N25</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[15]</td>
+   <td align="left">P26</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[16]</td>
+   <td align="left">P21</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[17]</td>
+   <td align="left">R24</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[18]</td>
+   <td align="left">R26</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[19]</td>
+   <td align="left">AB26</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[20]</td>
+   <td align="left">AA24</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[21]</td>
+   <td align="left">AB25</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[22]</td>
+   <td align="left">AC25</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+<tr>
+   <td align="left">HDMI_TX_D[23]</td>
+   <td align="left">AD25</td>
+   <td align="left">output</td>
+   <td align="left">3.3-V LVTTL</td>
+</tr>
+</table>
+<h2><a name="I2C for Audio/HDMI-TX/Si5338/HSMC"></a></h2><table border="3">
+<caption  align="left">I2C for Audio/HDMI-TX/Si5338/HSMC</caption>
+<br />
+<br />
+<tr>
+   <th align="left" bgcolor="Khaki">Name</th>
+   <th align="left" bgcolor="Khaki">Location</th>
+   <th align="left" bgcolor="Khaki">Direction</th>
+   <th align="left" bgcolor="Khaki">Standard</th>
+</tr>
+<tr>
+   <td align="left">I2C_SCL</td>
+   <td align="left">B7</td>
+   <td align="left">output</td>
+   <td align="left">2.5 V</td>
+</tr>
+<tr>
+   <td align="left">I2C_SDA</td>
+   <td align="left">G11</td>
+   <td align="left">inout </td>
+   <td align="left">2.5 V</td>
 </tr>
 </table>
 </html>
