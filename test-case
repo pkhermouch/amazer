@@ -1,9 +1,0 @@
-add r2 r7 2
-add r0 r0 4
-sub r0 r0 1
-brz r0 1
-brnz r2 -3
-sub r2 r2 r2
-brz r7 -6
-add r1 r2 2
-add r3 r3 3
