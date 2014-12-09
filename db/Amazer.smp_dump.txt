@@ -1,0 +1,7 @@
+
+State Machine - |Amazer|state
+Name state.STATE_YAY state.STATE_START_GAME state.STATE_CREATE_MAZE state.STATE_LOOPING 
+state.STATE_LOOPING 0 0 0 0 
+state.STATE_CREATE_MAZE 0 0 1 1 
+state.STATE_START_GAME 0 1 0 1 
+state.STATE_YAY 1 0 0 1 
