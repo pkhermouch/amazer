@@ -54,7 +54,6 @@ module Amazer(
    parameter STATE_GET_CELL2 = 8'h15;
    parameter STATE_GET_CELL3 = 8'h16;
    parameter STATE_WAITING_AGAIN = 8'h17;
-   parameter STATE_NO_STATE = 8'hff;
 
    // Matrix indexing
    //reg [8 * 32 - 1:0]                      cells[31:0];
@@ -63,19 +62,27 @@ module Amazer(
    // The player's position
    reg [7:0]               player_pos_i;
    reg [7:0]               player_pos_j;
+	reg [7:0]               player_pos_i_c;
+   reg [7:0]               player_pos_j_c;
+   
    // The current position we're operating on when creating the maze
    // Updated during stack manipulation
    reg [7:0]               current_pos_i;
    reg [7:0]               current_pos_j;
+   reg [7:0]               current_pos_i_c;
+   reg [7:0]               current_pos_j_c;
    //reg [7:0]                               stack_i[32 * 32 - 1:0];
    //reg [7:0]                               stack_j[32 * 32 - 1:0];
    // The pointer to the stack
    // Updated during stack manipulation
    reg [9:0]              stack_ptr;
+   reg [9:0]              stack_ptr_c;
    // The next position to operate on
    // Updated during main logic
    reg [7:0]               next_pos_i;
    reg [7:0]               next_pos_j;
+	reg [7:0]               next_pos_i_c;
+   reg [7:0]               next_pos_j_c;
 
    // used for initialization
    reg [7:0]               i;
@@ -88,6 +95,7 @@ module Amazer(
 
    // Counters how many clock cycles have passed
    reg [31:0]              counter;
+	reg [31:0]              counter_c;
    // Display logic for each cell
    reg [6:0]               cell0;
    reg [6:0]               cell1;
@@ -98,6 +106,7 @@ module Amazer(
    reg [5:0]               maze_width;
 
    reg [9:0]               leds;
+   reg [9:0]               leds_c;
    // Passing values between each clock
    reg                     should_reset;
    reg                     move_east;
@@ -109,6 +118,11 @@ module Amazer(
    reg                     move_west_clk;
    reg                     move_south_clk;
    reg                     move_north_clk;
+   reg                     should_reset_clk_c;
+   reg                     move_east_clk_c;
+   reg                     move_west_clk_c;
+   reg                     move_south_clk_c;
+   reg                     move_north_clk_c;
    // For fetching each cell from memory
    reg [7:0]               cell_me_reg;
    reg [7:0]               cell_me_c;
@@ -133,27 +147,52 @@ module Amazer(
    // Stack update logic
    // Updated during main logic
    reg                     do_push;
+	reg                     do_push_c;
 
-   /*
    ram mem(.address(mem_addr),
            .clock(CLK),
            .data(mem_data),
            .wren(mem_wren),
            .q(mem_out));
-    */
-   
-   initial begin
-      rand_seed = 2;
-      maze_height = 10;
-      maze_width = 10;
-      counter = 0;
-      state = STATE_CREATE_MAZE;
-	  next_pos_i = 0;
-	  next_pos_j = 0;
-   end
-   
+			  
+	initial begin
+		rand_seed = 2;
+		maze_height = 10;
+		maze_width = 10;
+		//state = STATE_CREATE_MAZE;
+		// Added to debug, shouldn't need this later
+		state = STATE_LOOPING;
+		player_pos_i = 0;
+		player_pos_j = 0;
+		current_pos_i = 0;
+		current_pos_j = 0;
+		leds = 0;
+		counter = 0;
+		stack_ptr = 1;
+	end
+    
    always @(*) begin
-      state_c = STATE_NO_STATE;
+		// Latching
+		state_c = state;
+		player_pos_i_c = player_pos_i;
+		player_pos_j_c = player_pos_j;
+		current_pos_i_c = current_pos_i;
+		current_pos_j_c = current_pos_j;
+		stack_ptr_c = stack_ptr;
+		next_pos_i_c = next_pos_i;
+		next_pos_j_c = next_pos_j;
+		counter_c = counter;
+		leds_c = leds;
+		should_reset_clk_c = should_reset_clk;
+		move_east_clk_c = move_east_clk;
+		move_west_clk_c = move_west_clk;
+		move_north_clk_c = move_north_clk;
+		move_south_clk_c = move_south_clk;
+		cell_me_c = cell_me_reg;
+		cell_north_c = cell_north_reg;
+		cell_south_c = cell_south_reg;
+		cell_east_c = cell_east_reg;
+		cell_west_c = cell_west_reg;
       if (state == STATE_GETTING_ME) begin
          mem_wren_reg = 0;
          mem_data_reg = 0;
@@ -164,7 +203,7 @@ module Amazer(
          mem_wren_reg = 0;
          mem_data_reg = 0;
          mem_addr_reg = {2'h0, current_pos_i[4:0] - 5'h1, current_pos_j[4:0]};
-         state = STATE_GETTING_S;
+         state_c = STATE_GETTING_S;
       end
       else if (state == STATE_GETTING_S) begin
          mem_wren_reg = 0;
@@ -198,6 +237,10 @@ module Amazer(
          state_c = STATE_SETTING_ME;
          cell_west_c = mem_out;
       end
+		else if (state == STATE_SETTING_ME) begin
+		   // Mark the current cell as visited
+			cell_me_c = cell_me_reg | 8'h80;
+		end
       else if (state == STATE_SETTING_N) begin
          mem_wren_reg = 1;
          mem_data_reg = cell_north_reg;
@@ -249,16 +292,16 @@ module Amazer(
       else if (state == STATE_UPDATE_STACK_2) begin
          state_c = STATE_UPDATE_STACK_3;
          if (do_push) begin
-            stack_ptr <= stack_ptr + 1;
+            stack_ptr_c = stack_ptr + 1;
          end
          else begin
-            current_pos_i <= mem_out;
-            stack_ptr <= stack_ptr - 1;
+            current_pos_i_c = mem_out;
+            stack_ptr_c = stack_ptr - 1;
          end
       end
       else if (state == STATE_UPDATE_STACK_3) begin
          if (!do_push) begin
-            current_pos_j <= mem_out;
+            current_pos_j_c = mem_out;
          end
          state_c = STATE_LOOPING;
       end
@@ -360,85 +403,79 @@ module Amazer(
          cell3 = cell3 & 7'h3f;
       end
        */
-   end
-
-   // posedge system clock, not buttons
-   always @(posedge CLK) begin
-      if (state_c != STATE_NO_STATE) begin
-         state <= state_c;
-      end
-      if (state != STATE_SETTING_ME) begin
-         cell_me_reg <= cell_me_c;
-         cell_north_reg <= cell_north_c;
-         cell_south_reg <= cell_south_c;
-         cell_east_reg <= cell_east_c;
-         cell_west_reg <= cell_west_c;
-      end
-      if (counter >= 32'd50000000) begin
-         counter <= 0;
+		if (counter >= 32'd50000000) begin
+         counter_c = 0;
       end else begin
-         counter <= counter + 1;
+         counter_c = counter + 1;
       end
-      // Mark the current cell as visited
-      cell_me_reg = cell_me_reg | 8'h80;
-	  if (should_reset != should_reset_clk) begin
-		 should_reset_clk <= should_reset;
-		 state <= STATE_CREATE_MAZE;
-	  end
+	   if (should_reset != should_reset_clk) begin
+		   should_reset_clk_c = should_reset;
+	   end
       if (state == STATE_CREATE_MAZE) begin
-         state <= STATE_LOOPING;
-         /*
-         for (i = 0; i < 10; i = i + 1) begin
-            cells[i] <= 0;
-         end
-          */
-         // Start position is 0, 0
-         current_pos_i <= 0;
-         current_pos_j <= 0;
-         stack_ptr <= 1;
+			player_pos_i_c = 0;
+			player_pos_j_c = 0;
+			current_pos_i_c = 0;
+			current_pos_j_c = 0;
+			stack_ptr_c = 1;
+			leds_c = 0;
+			// Clearing memory
+			if (counter > 4095) begin
+				counter_c = 0;
+				state_c = STATE_LOOPING;
+			end
+			else begin
+				counter_c = counter + 1;
+				mem_addr_reg = counter;
+				mem_wren_reg = 1;
+				mem_data_reg = 0;
+			end
       end else if (state == STATE_LOOPING) begin
          if (stack_ptr == 0) begin
-            state <= STATE_GET_CELL0;
-            player_pos_i <= 0;
-            player_pos_j <= 0;
-         end 
+            player_pos_i_c = 0;
+            player_pos_j_c = 0;
+            state_c = STATE_GET_CELL0;
+			end
          else begin
-            state <= STATE_GETTING_ME;
+            state_c = STATE_GETTING_ME;
          end
       end
       else if (state == STATE_SETTING_ME) begin
+			state_c = STATE_SETTING_N;
+			mem_wren_reg = 1;
+         mem_data_reg = cell_me_c;
+         mem_addr_reg = {2'h0, current_pos_i[4:0], current_pos_j[4:0]};
          if (any_neighbors != 0) begin
             /*
             stack_i[stack_ptr] <= current_pos_i;
             stack_j[stack_ptr] <= current_pos_j;
             stack_ptr <= stack_ptr + 1;
              */
-            do_push <= 1;
+            do_push_c = 1;
             // Remove walls
             if (next_pos_i == current_pos_i - 1) begin
                // Remove northern wall of current cell
                // cells[current_pos_i][8 * current_pos_j+:8] <= cells[current_pos_i][8 * current_pos_j+:8] | 8'h1;
                // cells[next_pos_i][8 * next_pos_j+:8] <= cells[next_pos_i][8 * next_pos_j+:8] | 8'h8;
-               cell_me_reg <= cell_me_reg | 8'h1;
-               cell_north_reg <= cell_north_reg | 8'h8;
+               cell_me_c = cell_me_reg | 8'h1;
+               cell_north_c = cell_north_reg | 8'h8;
             end else if (next_pos_i == current_pos_i + 1) begin
                // cells[current_pos_i][8 * current_pos_j+:8] <= cells[current_pos_i][8 * current_pos_j+:8] | 8'h8;
                // cells[next_pos_i][8 * next_pos_j+:8] <= cells[next_pos_i][8 * next_pos_j+:8] | 8'h1;
-               cell_me_reg <= cell_me_reg | 8'h8;
-               cell_south_reg <= cell_south_reg | 8'h1;
+               cell_me_c = cell_me_reg | 8'h8;
+               cell_south_c = cell_south_reg | 8'h1;
             end else if (next_pos_j == current_pos_j - 1) begin
                //cells[current_pos_i][8 * current_pos_j+:8] <= cells[current_pos_i][8 * current_pos_j+:8] | 8'h30;
                //cells[next_pos_i][8 * next_pos_j+:8] <= cells[next_pos_i][8 * next_pos_j+:8] | 8'h6;
-               cell_me_reg <= cell_me_reg | 8'h30;
-               cell_east_reg <= cell_east_reg | 8'h6;
+               cell_me_c = cell_me_reg | 8'h30;
+               cell_east_c = cell_east_reg | 8'h6;
             end else begin
                //cells[current_pos_i][8 * current_pos_j+:8] <= cells[current_pos_i][8 * current_pos_j+:8] | 8'h6;
                //cells[next_pos_i][8 * next_pos_j+:8] <= cells[next_pos_i][8 * next_pos_j+:8] | 8'h30;
-               cell_me_reg <= cell_me_reg | 8'h6;
-               cell_west_reg <= cell_west_reg | 8'h30;
+               cell_me_c = cell_me_reg | 8'h6;
+               cell_west_c = cell_west_reg | 8'h30;
             end
          end else begin // if (any_neighbors != 0)
-            do_push <= 0;
+            do_push_c = 0;
          end // else: !if(any_neighbors != 0)
       end // if (state == STATE_LOOPING)
       else if (state == STATE_GET_CELL0 ||
@@ -446,30 +483,101 @@ module Amazer(
                state == STATE_GET_CELL2 ||
                state == STATE_GET_CELL3) begin
          if (player_pos_i == maze_height - 1 && player_pos_j == maze_width - 1) begin
-            state <= STATE_YAY;
+            state_c = STATE_YAY;
          end
 		 if (move_north != move_north_clk) begin
-			move_north_clk <= move_north;
-			player_pos_i <= player_pos_i - 1;
+			move_north_clk_c = move_north;
+			player_pos_i_c = player_pos_i - 1;
 		 end else if (move_south != move_south_clk) begin
-			move_south_clk <= move_south;
-			player_pos_i <= player_pos_i + 1;
+			move_south_clk_c = move_south;
+			player_pos_i_c = player_pos_i + 1;
 		 end else if (move_east != move_east_clk) begin
-			move_east_clk <= move_east;
-			player_pos_j <= player_pos_j - 1;
+			move_east_clk_c = move_east;
+			player_pos_j_c = player_pos_j - 1;
 		 end else if (move_west != move_west_clk) begin
-			move_west_clk <= move_west;
-			player_pos_j <= player_pos_j + 1;
+			move_west_clk_c = move_west;
+			player_pos_j_c = player_pos_j + 1;
 		 end
       end
       else if (state == STATE_YAY) begin
          if (counter == 31'd25000000) begin
-            leds <= 10'h3ff;
+            leds_c = 10'h3ff;
          end
          if (counter == 31'd0) begin
-            leds <= 10'h0;
+            leds_c = 10'h0;
          end
       end
+		
+		if (should_reset != should_reset_clk) begin
+		   state_c = STATE_CREATE_MAZE;
+			counter_c = 0;
+	   end
+		
+		// Kill bugs
+		if (SW[9:0] == 10'h3ff) begin
+		   case (state[3:0])
+				4'h0 : cell0 = 7'b1000000;
+				4'h1 : cell0 = 7'b1111001;
+				4'h2 : cell0 = 7'b0100100;
+				4'h3 : cell0 = 7'b0110000;
+				4'h4 : cell0 = 7'b0011001;
+				4'h5 : cell0 = 7'b0010010;
+				4'h6 : cell0 = 7'b0000010;
+				4'h7 : cell0 = 7'b1111000;
+				4'h8 : cell0 = 7'b0000000;
+				4'h9 : cell0 = 7'b0010000;
+				4'hA : cell0 = 7'b0001000;
+				4'hB : cell0 = 7'b0000011;
+				4'hC : cell0 = 7'b0100111;
+				4'hD : cell0 = 7'b0100001;
+				4'hE : cell0 = 7'b0000110;
+				4'hF : cell0 = 7'b0001110;
+			endcase
+		end
+		if (SW[9:0] == 10'h2ff) begin
+		   case (counter[3:0])
+				4'h0 : cell0 = 7'b1000000;
+				4'h1 : cell0 = 7'b1111001;
+				4'h2 : cell0 = 7'b0100100;
+				4'h3 : cell0 = 7'b0110000;
+				4'h4 : cell0 = 7'b0011001;
+				4'h5 : cell0 = 7'b0010010;
+				4'h6 : cell0 = 7'b0000010;
+				4'h7 : cell0 = 7'b1111000;
+				4'h8 : cell0 = 7'b0000000;
+				4'h9 : cell0 = 7'b0010000;
+				4'hA : cell0 = 7'b0001000;
+				4'hB : cell0 = 7'b0000011;
+				4'hC : cell0 = 7'b0100111;
+				4'hD : cell0 = 7'b0100001;
+				4'hE : cell0 = 7'b0000110;
+				4'hF : cell0 = 7'b0001110;
+			endcase
+		end
+   end
+
+   // posedge system clock, not buttons
+   always @(posedge CLK) begin
+		state <= state_c;
+		player_pos_i <= player_pos_i_c;
+		player_pos_j <= player_pos_j_c;
+		current_pos_i <= current_pos_i_c;
+		current_pos_j <= current_pos_j_c;
+		stack_ptr <= stack_ptr_c;
+		next_pos_i <= next_pos_i_c;
+		next_pos_j <= next_pos_j_c;
+		counter <= counter_c;
+		leds <= leds_c;
+		should_reset_clk <= should_reset_clk_c;
+		move_east_clk <= move_east_clk_c;
+		move_west_clk <= move_west_clk_c;
+		move_north_clk <= move_north_clk_c;
+		move_south_clk <= move_south_clk_c;
+		cell_me_reg <= cell_me_c;
+		cell_north_reg <= cell_north_c;
+		cell_south_reg <= cell_south_c;
+		cell_east_reg <= cell_east_c;
+		cell_west_reg <= cell_west_c;
    end // always @ (posedge clk)
 
    assign mem_wren = mem_wren_reg;
@@ -510,7 +618,8 @@ module Amazer(
    assign LEDR = leds;
    assign LEDG = leds[7:0];
    
-   assign CLK = CLOCK_50_B5B;
+   //assign CLK = CLOCK_50_B5B;
+	assign CLK = KEY[0];
    
    // Display logic: read switches, show section of maze on 7-seg display, show player position on LEDR,
    // read button presses and move player
