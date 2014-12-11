@@ -86,22 +86,25 @@ module Amazer(
 
    // used for initialization
    reg [7:0]               i;
-   // Used for randomly choosing a neighbor
-   reg [31:0]              rand_seed;
-   reg [31:0]              rand_num;
    // used to determine if there are any unvisited neighbors at the current cell
    reg [7:0]               any_neighbors;
    reg [7:0]               num_neighbors;
+	// MORE DEBUG WIRES
+	reg unv_n;
+	reg unv_s;
+	reg unv_e;
+	reg unv_w;
+	reg[1:0] make_maze;
 
    // Counters how many clock cycles have passed
    reg [31:0]              counter;
    reg [31:0]              counter_c;
    // Display logic for each cell
    reg [15:0]              ss_debug;
-   reg [6:0]               cell0;
-   reg [6:0]               cell1;
-   reg [6:0]               cell2;
-   reg [6:0]               cell3;
+   reg [7:0]               cell0;
+   reg [7:0]               cell1;
+   reg [7:0]               cell2;
+   reg [7:0]               cell3;
    wire [6:0]               d0;
    wire [6:0]               d1;
    wire [6:0]               d2;
@@ -159,9 +162,19 @@ module Amazer(
            .data(mem_data),
            .wren(mem_wren),
            .q(mem_out));
+			  
+	wire [4:0] next_rand;
+	reg rand_reset;
+	reg [4:0] rand_num;
+	
+	psuedo_random pr1(
+		.clk(CLK),
+		.rst_n(rand_reset),
+		.seed(counter),
+		.data(next_rand)
+	);
 
    initial begin
-	  rand_seed = 2;
 	  maze_height = 10;
 	  maze_width = 10;
 	  //state = STATE_CREATE_MAZE;
@@ -198,6 +211,8 @@ module Amazer(
 	  cell_south_c = cell_south_reg;
 	  cell_east_c = cell_east_reg;
 	  cell_west_c = cell_west_reg;
+	  make_maze = 0;
+	  rand_reset = 0;
       if (state == STATE_GETTING_ME) begin
          mem_wren_reg = 0;
          mem_data_reg = 0;
@@ -242,10 +257,6 @@ module Amazer(
          state_c = STATE_SETTING_ME;
          cell_west_c = mem_out;
       end
-	  else if (state == STATE_SETTING_ME) begin
-		 // Mark the current cell as visited
-		 cell_me_c = cell_me_reg | 8'h80;
-	  end
       else if (state == STATE_SETTING_N) begin
          mem_wren_reg = 1;
          mem_data_reg = cell_north_reg;
@@ -318,7 +329,7 @@ module Amazer(
          mem_addr_reg = {2'h0, SW[9:0]};
          cell2 = mem_out;
          if (SW[9:5] == player_pos_i && SW[4:0] == player_pos_j) begin
-            cell2 = cell2 & 7'h3f;
+            cell2 = cell2 & 8'h3f;
          end
       end
       else if (state == STATE_GET_CELL1) begin
@@ -327,7 +338,7 @@ module Amazer(
          mem_addr_reg = {2'h0, SW[9:0] + 10'h1};
          cell3 = mem_out;
          if (SW[9:5] == player_pos_i && SW[4:0] == player_pos_j) begin
-            cell3 = cell3 & 7'h3f;
+            cell3 = cell3 & 8'h3f;
          end
       end
       else if (state == STATE_GET_CELL2) begin
@@ -336,7 +347,7 @@ module Amazer(
          mem_addr_reg = {2'h0, SW[9:0] + 10'h2};
          cell0 = mem_out;
          if (SW[9:5] == player_pos_i && SW[4:0] == player_pos_j) begin
-            cell0 = cell0 & 7'h3f;
+            cell0 = cell0 & 8'h3f;
          end
       end
       else if (state == STATE_GET_CELL3) begin
@@ -345,7 +356,7 @@ module Amazer(
          mem_addr_reg = {2'h0, SW[9:0] + 10'h3};
          cell1 = mem_out;
          if (SW[9:5] == player_pos_i && SW[4:0] == player_pos_j) begin
-            cell1 = cell1 & 7'h3f;
+            cell1 = cell1 & 8'h3f;
          end
       end
       
@@ -376,7 +387,9 @@ module Amazer(
 	  if (should_reset != should_reset_clk) begin
 		 should_reset_clk_c = should_reset;
 	  end
+		make_maze = 2;
       if (state == STATE_CREATE_MAZE) begin
+		 rand_reset = 1;
 		 player_pos_i_c = 0;
 		 player_pos_j_c = 0;
 		 current_pos_i_c = 0;
@@ -405,27 +418,49 @@ module Amazer(
          end
       end
       else if (state == STATE_SETTING_ME) begin
-
+			// Mark the current cell as visited
+			cell_me_c = cell_me_c | 8'h80;
          // Maze creation logic
-         any_neighbors = 0;
-         num_neighbors = 0;
-         if (current_pos_i + 1 < maze_height && cell_south_reg & 8'h80 == 0) begin
-            any_neighbors = any_neighbors | 1;
-            num_neighbors = num_neighbors + 1;
-         end else if (current_pos_j + 1 < maze_width && cell_west_reg & 8'h80 == 0) begin
-            any_neighbors = any_neighbors | 2;
-            num_neighbors = num_neighbors + 1;
-         end else if (current_pos_i - 1 >= 0 && cell_north_reg & 8'h80 == 0) begin
-            any_neighbors = any_neighbors | 4;
-            num_neighbors = num_neighbors + 1;
-         end else if (current_pos_j - 1 >= 0 && cell_east_reg & 8'h80 == 0) begin
-            any_neighbors = any_neighbors | 8;
-            num_neighbors = num_neighbors + 1;
+         any_neighbors = 8'h0;
+         num_neighbors = 8'h0;
+			make_maze = 1;
+			// Debug
+			unv_e = 0;
+			unv_w = 0;
+			unv_n = 0;
+			unv_s = 0;
+			/*
+			if ((current_pos_j + 1 < maze_width)) begin
+			   unv_n = 1;
+			end
+			if (((cell_west_reg & 8'h80) == 8'h0)) begin
+				unv_s = 1;
+			end
+			*/
+         if ((current_pos_i + 1 < maze_height) && ((cell_south_reg & 8'h80) == 8'h0)) begin
+            any_neighbors = any_neighbors | 8'h1;
+            num_neighbors = num_neighbors + 8'h1;
+				unv_s = 1;
+         end
+			if ((current_pos_j + 1 < maze_width) && ((cell_west_reg & 8'h80) == 8'h0)) begin
+            any_neighbors = any_neighbors | 8'h2;
+            num_neighbors = num_neighbors + 8'h1;
+				unv_w = 1;
+         end
+			if (($signed(current_pos_i - 1) >= $signed(0)) && ((cell_north_reg & 8'h80) == 8'h0)) begin
+            any_neighbors = any_neighbors | 8'h4;
+            num_neighbors = num_neighbors + 8'h1;
+				unv_n = 1;
+         end
+			if (($signed(current_pos_j - 1) >= $signed(0)) && ((cell_east_reg & 8'h80) == 8'h0)) begin
+            any_neighbors = any_neighbors | 8'h8;
+            num_neighbors = num_neighbors + 8'h1;
+				unv_e = 1;
          end
 
          if (num_neighbors > 0) begin
             // Pick a random neighbor among the neighbors that haven't been visited
-            rand_num = $rand(rand_seed) % num_neighbors;
+            rand_num = next_rand % num_neighbors;
             for (i = 0; i < rand_num; i = i + 1) begin
                // Remove a random number of bits
                any_neighbors = any_neighbors & (any_neighbors - 1);
@@ -433,13 +468,13 @@ module Amazer(
             // Isolate the rightmost bit
             any_neighbors = any_neighbors & (-1 * any_neighbors);
             // Logic to set next_pos_i and next_pos_j
-            if (any_neighbors == 1) begin
+            if (any_neighbors == 8'h1) begin
                next_pos_i_c = current_pos_i + 1;
                next_pos_j_c = current_pos_j;
-            end else if (any_neighbors == 2) begin
+            end else if (any_neighbors == 8'h2) begin
                next_pos_i_c = current_pos_i;
                next_pos_j_c = current_pos_j + 1;
-            end else if (any_neighbors == 4) begin
+            end else if (any_neighbors == 8'h4) begin
                next_pos_i_c = current_pos_i - 1;
                next_pos_j_c = current_pos_j;
             end else begin
@@ -461,22 +496,22 @@ module Amazer(
                // Remove northern wall of current cell
                // cells[current_pos_i][8 * current_pos_j+:8] <= cells[current_pos_i][8 * current_pos_j+:8] | 8'h1;
                // cells[next_pos_i][8 * next_pos_j+:8] <= cells[next_pos_i][8 * next_pos_j+:8] | 8'h8;
-               cell_me_c = cell_me_reg | 8'h1;
+               cell_me_c = cell_me_c | 8'h1;
                cell_north_c = cell_north_reg | 8'h8;
             end else if (next_pos_i_c == current_pos_i + 1) begin
                // cells[current_pos_i][8 * current_pos_j+:8] <= cells[current_pos_i][8 * current_pos_j+:8] | 8'h8;
                // cells[next_pos_i][8 * next_pos_j+:8] <= cells[next_pos_i][8 * next_pos_j+:8] | 8'h1;
-               cell_me_c = cell_me_reg | 8'h8;
+               cell_me_c = cell_me_c | 8'h8;
                cell_south_c = cell_south_reg | 8'h1;
             end else if (next_pos_j_c == current_pos_j - 1) begin
                //cells[current_pos_i][8 * current_pos_j+:8] <= cells[current_pos_i][8 * current_pos_j+:8] | 8'h30;
                //cells[next_pos_i][8 * next_pos_j+:8] <= cells[next_pos_i][8 * next_pos_j+:8] | 8'h6;
-               cell_me_c = cell_me_reg | 8'h30;
+               cell_me_c = cell_me_c | 8'h30;
                cell_east_c = cell_east_reg | 8'h6;
             end else begin
                //cells[current_pos_i][8 * current_pos_j+:8] <= cells[current_pos_i][8 * current_pos_j+:8] | 8'h6;
                //cells[next_pos_i][8 * next_pos_j+:8] <= cells[next_pos_i][8 * next_pos_j+:8] | 8'h30;
-               cell_me_c = cell_me_reg | 8'h6;
+               cell_me_c = cell_me_c | 8'h6;
                cell_west_c = cell_west_reg | 8'h30;
             end
          end else begin // if (any_neighbors != 0)
@@ -491,7 +526,7 @@ module Amazer(
                state == STATE_GET_CELL1 ||
                state == STATE_GET_CELL2 ||
                state == STATE_GET_CELL3) begin
-         if (player_pos_i == maze_height - 1 && player_pos_j == maze_width - 1) begin
+         if ((player_pos_i == (maze_height - 1)) && (player_pos_j == (maze_width - 1))) begin
             state_c = STATE_YAY;
          end
 		 if (move_north != move_north_clk) begin
@@ -526,9 +561,15 @@ module Amazer(
       if (SW[9]) begin
          ss_debug = {8'h0, state};
       end
-	  else if (SW[8]) begin
+		else if (SW[8] && SW[7] && SW[6]) begin
+			ss_debug = {make_maze, 1'h0, unv_n, 3'h0, unv_s, 3'h0, unv_e, 3'h0, unv_w};
+		end
+      else if (SW[8] && SW[7]) begin
+			ss_debug = {current_pos_i + 8'h1, current_pos_i - 8'h1};
+		end
+	   else if (SW[8]) begin
          ss_debug = {player_pos_i, player_pos_j};
-	  end
+	   end
       else if (SW[7]) begin
          ss_debug = {current_pos_i, current_pos_j};
       end
@@ -544,19 +585,27 @@ module Amazer(
       else if (SW[3]) begin
          ss_debug = {2'h0, maze_height, 2'h0, maze_width};
       end
+		else if (SW[2] && SW[1] && SW[0]) begin
+			ss_debug = {8'h0, mem_data_reg};
+		end
       else if (SW[2]) begin
          ss_debug = {8'h0, cell_me_reg};
       end
+		else if (SW[1] && SW[0]) begin
+			ss_debug = {3'h0, mem_wren_reg, mem_addr_reg};
+		end
       else if (SW[1]) begin
          ss_debug = {cell_north_reg, cell_south_reg};
       end
       else if (SW[0]) begin
          ss_debug = {cell_east_reg, cell_west_reg};
       end
-      cell0 = {3'h0, ss_debug[3:0]};
-      cell1 = {3'h0, ss_debug[7:4]};
-      cell2 = {3'h0, ss_debug[11:8]};
-      cell3 = {3'h0, ss_debug[15:12]};
+		if (!KEY[3]) begin
+			cell0 = {3'h0, ss_debug[3:0]};
+			cell1 = {3'h0, ss_debug[7:4]};
+			cell2 = {3'h0, ss_debug[11:8]};
+			cell3 = {3'h0, ss_debug[15:12]};
+		end
    end
 
    // posedge system clock, not buttons
@@ -581,6 +630,7 @@ module Amazer(
 	  cell_south_reg <= cell_south_c;
 	  cell_east_reg <= cell_east_c;
 	  cell_west_reg <= cell_west_c;
+		do_push <= do_push_c;
    end // always @ (posedge clk)
 
    assign mem_wren = mem_wren_reg;
@@ -619,10 +669,10 @@ module Amazer(
    assign HEX1 = d1;
    assign HEX0 = d0;
 
-   display dd0(cell0[3:0], d0);
-   display dd1(cell1[3:0], d1);
-   display dd2(cell2[3:0], d2);
-   display dd3(cell3[3:0], d3);
+   display dd0(cell0, d0);
+   display dd1(cell1, d1);
+   display dd2(cell2, d2);
+   display dd3(cell3, d3);
    
    assign LEDR = leds;
    assign LEDG = leds[7:0];
@@ -637,27 +687,62 @@ endmodule
 
 module display(NUM, HEX);
 
-   input[3:0] NUM;
+   input[7:0] NUM;
    output [6:0] HEX;
    reg [6:0]    HEX;
 
-   always @(*)
-     case (NUM)
-       4'h0 : HEX = 7'b1000000;
-       4'h1 : HEX = 7'b1111001;
-       4'h2 : HEX = 7'b0100100;
-       4'h3 : HEX = 7'b0110000;
-       4'h4 : HEX = 7'b0011001;
-       4'h5 : HEX = 7'b0010010;
-       4'h6 : HEX = 7'b0000010;
-       4'h7 : HEX = 7'b1111000;
-       4'h8 : HEX = 7'b0000000;
-       4'h9 : HEX = 7'b0010000;
-       4'hA : HEX = 7'b0001000;
-       4'hB : HEX = 7'b0000011;
-       4'hC : HEX = 7'b0100111;
-       4'hD : HEX = 7'b0100001;
-       4'hE : HEX = 7'b0000110;
-       4'hF : HEX = 7'b0001110;
-     endcase // case (NUM)
+   always @(*) begin
+		if (NUM <= 8'hf) begin
+		  case (NUM)
+			 4'h0 : HEX = 7'b1000000;
+			 4'h1 : HEX = 7'b1111001;
+			 4'h2 : HEX = 7'b0100100;
+			 4'h3 : HEX = 7'b0110000;
+			 4'h4 : HEX = 7'b0011001;
+			 4'h5 : HEX = 7'b0010010;
+			 4'h6 : HEX = 7'b0000010;
+			 4'h7 : HEX = 7'b1111000;
+			 4'h8 : HEX = 7'b0000000;
+			 4'h9 : HEX = 7'b0010000;
+			 4'hA : HEX = 7'b0001000;
+			 4'hB : HEX = 7'b0000011;
+			 4'hC : HEX = 7'b0100111;
+			 4'hD : HEX = 7'b0100001;
+			 4'hE : HEX = 7'b0000110;
+			 4'hF : HEX = 7'b0001110;
+		  endcase // case (NUM)
+		end
+		else begin
+			HEX = NUM[6:0];
+		end
+	end
 endmodule // display
+
+// Thank you Stack Overflow! This came from
+// http://stackoverflow.com/questions/14497877/how-to-implement-a-pseudo-hardware-random-number-generator
+// Modified to take a counter to use as the seed
+module psuedo_random(
+   input clk,
+   input rst_n,
+	input [31:0] seed,
+   output reg [4:0] data
+);
+
+	reg [4:0] data_next;
+
+	always @* begin
+      data_next[4] = data[4]^data[1];
+ 	   data_next[3] = data[3]^data[0];
+	   data_next[2] = data[2]^data_next[4];
+	   data_next[1] = data[1]^data_next[3];
+	   data_next[0] = data[0]^data_next[2];
+	end
+
+	always @(posedge clk or posedge rst_n)
+	   if(rst_n)
+		   //data <= 5'h1f;
+			data <= seed[4:0];
+	   else
+		   data <= data_next;
+
+endmodule
