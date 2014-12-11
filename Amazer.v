@@ -54,6 +54,7 @@ module Amazer(
    parameter STATE_GET_CELL2 = 8'h15;
    parameter STATE_GET_CELL3 = 8'h16;
    parameter STATE_WAITING_AGAIN = 8'h17;
+	parameter STATE_GET_PLAYER = 8'h18;
 
    // Matrix indexing
    //reg [8 * 32 - 1:0]                      cells[31:0];
@@ -142,6 +143,9 @@ module Amazer(
    reg [7:0]               cell_east_c;
    reg [7:0]               cell_south_c;
    reg [7:0]               cell_west_c;
+	
+	reg [7:0]               player_cell_reg;
+	reg [7:0]               player_cell_c;
 
    // Memory addresses
    wire [7:0]              mem_data;
@@ -177,8 +181,9 @@ module Amazer(
    initial begin
 	  maze_height = 10;
 	  maze_width = 10;
-	  //state = STATE_CREATE_MAZE;
+	  state = STATE_CREATE_MAZE;
 	  // Added to debug, shouldn't need this later
+	  /*
 	  state = STATE_LOOPING;
 	  player_pos_i = 0;
 	  player_pos_j = 0;
@@ -187,6 +192,7 @@ module Amazer(
 	  leds = 0;
 	  counter = 0;
 	  stack_ptr = 1;
+	  */
    end
    
    always @(*) begin
@@ -213,6 +219,7 @@ module Amazer(
 	  cell_west_c = cell_west_reg;
 	  make_maze = 0;
 	  rand_reset = 0;
+	  player_cell_c = player_cell_reg;
       if (state == STATE_GETTING_ME) begin
          mem_wren_reg = 0;
          mem_data_reg = 0;
@@ -327,23 +334,18 @@ module Amazer(
          state_c = STATE_GET_CELL1;
          mem_wren_reg = 0;
          mem_addr_reg = {2'h0, SW[9:0]};
-         //cell2 = mem_out;
-			cell_south_c = mem_out;
-         if ((SW[9:5] == player_pos_i) && ((SW[4:0] + 5'h2) == player_pos_j)) begin
-            //cell2 = cell2 & 8'h3f;
-				cell_south_c = cell_south_c & 8'hbf;
-         end
-      end
-      else if (state == STATE_GET_CELL1) begin
-         state_c = STATE_GET_CELL2;
-         mem_wren_reg = 0;
-         mem_addr_reg = {2'h0, SW[9:0] + 10'h1};
          //cell3 = mem_out;
 			cell_west_c = mem_out;
          if ((SW[9:5] == player_pos_i) && ((SW[4:0] + 5'h3) == player_pos_j)) begin
             //cell3 = cell3 & 8'h3f;
 				cell_west_c = cell_west_c & 8'hbf;
          end
+      end
+      else if (state == STATE_GET_CELL1) begin
+         state_c = STATE_GET_CELL2;
+         mem_wren_reg = 0;
+         mem_addr_reg = {2'h0, SW[9:0] + 10'h1};
+         player_cell_c = mem_out;
       end
       else if (state == STATE_GET_CELL2) begin
          state_c = STATE_GET_CELL3;
@@ -357,7 +359,7 @@ module Amazer(
          end
       end
       else if (state == STATE_GET_CELL3) begin
-         state_c = STATE_GET_CELL0;
+         state_c = STATE_GET_PLAYER;
          mem_wren_reg = 0;
          mem_addr_reg = {2'h0, SW[9:0] + 10'h3};
          //cell1 = mem_out;
@@ -365,6 +367,17 @@ module Amazer(
          if ((SW[9:5] == player_pos_i) && ((SW[4:0] + 5'h1) == player_pos_j)) begin
             //cell1 = cell1 & 8'h3f;
 				cell_east_c = cell_east_c & 8'hbf;
+         end
+      end
+      else if (state == STATE_GET_PLAYER) begin
+         state_c = STATE_GET_CELL0;
+         mem_wren_reg = 0;
+         mem_addr_reg = {2'h0, player_pos_i[4:0], player_pos_j[4:0]};
+         //cell2 = mem_out;
+			cell_south_c = mem_out;
+         if ((SW[9:5] == player_pos_i) && ((SW[4:0] + 5'h2) == player_pos_j)) begin
+            //cell2 = cell2 & 8'h3f;
+				cell_south_c = cell_south_c & 8'hbf;
          end
       end
       
@@ -397,7 +410,6 @@ module Amazer(
 	  end
 		make_maze = 2;
       if (state == STATE_CREATE_MAZE) begin
-		 rand_reset = 1;
 		 player_pos_i_c = 0;
 		 player_pos_j_c = 0;
 		 current_pos_i_c = 0;
@@ -465,7 +477,14 @@ module Amazer(
             num_neighbors = num_neighbors + 8'h1;
 				unv_e = 1;
          end
-
+			
+			// Special logic if we're at the end-point of the maze to make sure there is only
+			// one path there
+			if ((current_pos_i == (maze_height - 1)) && (current_pos_j == (maze_width - 1))) begin
+				num_neighbors = 0;
+				any_neighbors = 0;
+			end
+			
          if (num_neighbors > 0) begin
             // Pick a random neighbor among the neighbors that haven't been visited
             rand_num = next_rand % num_neighbors;
@@ -533,7 +552,8 @@ module Amazer(
       else if (state == STATE_GET_CELL0 ||
                state == STATE_GET_CELL1 ||
                state == STATE_GET_CELL2 ||
-               state == STATE_GET_CELL3) begin
+               state == STATE_GET_CELL3 ||
+					state == STATE_GET_PLAYER) begin
 			// Assign wires to the currently shown cells
 			cell0 = cell_north_reg;
 			cell1 = cell_east_reg;
@@ -544,26 +564,46 @@ module Amazer(
          end
 		 if (move_north != move_north_clk) begin
 			move_north_clk_c = move_north;
+			/*
 			if ((SW[9:0] == {player_pos_i[4:0], player_pos_j[4:0]}) &&
 			    (cell0 & 8'h1)) begin
 				player_pos_i_c = player_pos_i - 1;
 			end
+			*/
+			if (player_cell_reg & 8'h1) begin
+				player_pos_i_c = player_pos_i - 1;
+			end
 		 end else if (move_south != move_south_clk) begin
 			move_south_clk_c = move_south;
+			/*
 			if ((SW[9:0] == {player_pos_i[4:0], player_pos_j[4:0]}) &&
 			    (cell0 & 8'h8)) begin
 				player_pos_i_c = player_pos_i + 1;
 			end
+			*/
+			if (player_cell_reg & 8'h8) begin
+				player_pos_i_c = player_pos_i + 1;
+			end
 		 end else if (move_east != move_east_clk) begin
 			move_east_clk_c = move_east;
+			/*
 			if ((SW[9:0] == {player_pos_i[4:0], player_pos_j[4:0]}) &&
 			    (cell0 & 8'h6)) begin
 				player_pos_j_c = player_pos_j - 1;
 			end
+			*/
+			if (player_cell_reg & 8'h6) begin
+				player_pos_j_c = player_pos_j - 1;
+			end
 		 end else if (move_west != move_west_clk) begin
 			move_west_clk_c = move_west;
+			/*
 			if ((SW[9:0] == {player_pos_i[4:0], player_pos_j[4:0]}) &&
 			    (cell0 & 8'h30)) begin
+				player_pos_j_c = player_pos_j + 1;
+			end
+			*/
+			if (player_cell_reg & 8'h30) begin
 				player_pos_j_c = player_pos_j + 1;
 			end
 		 end
@@ -576,10 +616,16 @@ module Amazer(
          if (counter == 31'd0) begin
             leds_c = 10'h0;
          end
+			// Tell the player "YAYY"
+			cell0 = 8'b10010001;
+			cell1 = 8'b10010001;
+			cell2 = 8'b10001000;
+			cell3 = 8'b10010001;
       end
 	  
 	  if (should_reset != should_reset_clk) begin
 		 state_c = STATE_CREATE_MAZE;
+		 rand_reset = 1;
 		 counter_c = 0;
 	  end
 	  
@@ -659,6 +705,7 @@ module Amazer(
 	  cell_east_reg <= cell_east_c;
 	  cell_west_reg <= cell_west_c;
 		do_push <= do_push_c;
+		player_cell_reg <= player_cell_c;
    end // always @ (posedge clk)
 
    assign mem_wren = mem_wren_reg;
@@ -667,24 +714,24 @@ module Amazer(
 
    // Move north
    always @(posedge KEY[3]) begin
-      if (player_pos_i > 0) begin
+      //if (player_pos_i > 0) begin
 		 move_north <= ~move_north;
-      end
+      //end
    end
    always @(posedge KEY[2]) begin
-      if (player_pos_i < maze_height) begin
+      //if (player_pos_i < maze_height) begin
          move_south <= ~move_south;
-      end
+      //end
    end
    always @(posedge KEY[1]) begin
-      if (player_pos_j > 0) begin
-         move_east <= ~move_east;
-      end
+      //if (player_pos_j > 0) begin
+         move_west <= ~move_west;
+      //end
    end
    always @(posedge KEY[0]) begin
-      if (player_pos_j < maze_width) begin
-         move_west <= ~move_west;
-      end
+      //if (player_pos_j < maze_width) begin
+         move_east <= ~move_east;
+      //end
    end
    always @(posedge CPU_RESET_n) begin
       maze_height <= SW[9:5] + 1;
