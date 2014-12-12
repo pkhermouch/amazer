@@ -1,0 +1,18 @@
+Look! It's Amazer!
+Paul Khermouch (pmk463)
+CS 350C Fall 2014 -- Prof. Gheith
+
+On the surface
+This project randomly generates mazes of variable dimensions, and allows the player to attempt to get from one corner of the maze to the other. Upon loading the project, a 10x10 maze will be generated. Four adjacent cells are shown on the 7-segment display; flipping the switches will show different parts of the maze. Switches 0-4 control which columns appear (for example, having only switch 2 on will show columns 4-7, right to left), and switches 5-9 control which rows appear (e.g., having only switch 4 on will show row 16). The center horizontal segment will be turned on to indicate the player's current position; the coordinates of the player are also displayed on the red LEDs. The buttons are used to navigate the maze; key 3 moves the player north, key 2 the player south, key 1 the player west and key 0 the player east. The player is not allowed to move through walls, obviously. The green LEDs indicate how many seconds have elapsed since the maze was generated. The player starts at the northeast corner of the maze, and must attempt to reach the southwest corner of the maze. If the player reaches the end of the maze, a congratulatory message will appear. When the reset button is pressed, a new maze will be generated, and the size of the maze is determined by the switches. Switches 0-4 control how many columns there will be, and switches 5-9 control the number of rows. There can be anywhere from 1 to 32 rows and columns.
+
+Internals
+I implemented this project using a straightforward state machine. Originally I had planned everything out after naively assuming that I would be able to keep my stack and cells as combinational registers, but it was too large to fit on the board, so I changed everything to accomodate a one-port memory. The memory is 8 bits wide and 4096 bytes deep; the lowest kilobyte in memory stores the cells, the next stores one stack and the third stores the second stack. Since there can be at most 32 x 32 = 1024 cells, this suffices to store the largest possible maze. Each cell is represented as a byte, which is its 7-segment display plus a bit that tells whether the cell has been visited already during the maze generation algorithm. The algorithm is fairly simple and uses a randomized depth-first search:
+
+- Make the start cell in the maze the current cell and push it onto the stack
+- While the stack is not empty:
+  - Mark the current cell as visited
+  - If the current cell has any unvisited neighbors:
+    - Pick a random neighbor, push the current cell onto the stack and make the chosen neighbor the new current cell
+  - Otherwise, pop off the stack to get the new current cell
+
+This is guaranteed to visit every cell in the search space, and typically makes for nice, long, twisty paths in the maze. Figuring out how to pick a random neighbor without using any sort of list data structure took some thought. Once the maze has been created, the program cycles through a series of five states, fetching the four cells to display on the 7-segment display as well as the cell that the player is currently located in, which is used to allow or disallow movement when a button is pressed.
