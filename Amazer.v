@@ -146,6 +146,9 @@ module Amazer(
 	
 	reg [7:0]               player_cell_reg;
 	reg [7:0]               player_cell_c;
+	
+	reg [8:0]               seconds_played;
+	reg [8:0]               seconds_played_c;
 
    // Memory addresses
    wire [7:0]              mem_data;
@@ -220,6 +223,7 @@ module Amazer(
 	  make_maze = 0;
 	  rand_reset = 0;
 	  player_cell_c = player_cell_reg;
+		seconds_played_c = seconds_played;
       if (state == STATE_GETTING_ME) begin
          mem_wren_reg = 0;
          mem_data_reg = 0;
@@ -402,6 +406,7 @@ module Amazer(
        */
 	  if (counter >= 32'd50000000) begin
          counter_c = 0;
+			seconds_played_c = seconds_played + 1;
       end else begin
          counter_c = counter + 1;
       end
@@ -416,6 +421,7 @@ module Amazer(
 		 current_pos_j_c = 0;
 		 stack_ptr_c = 1;
 		 leds_c = 0;
+		 seconds_played_c = 0;
 		 // Clearing memory
 		 if (counter > 4095) begin
 			counter_c = 0;
@@ -616,6 +622,7 @@ module Amazer(
          if (counter == 31'd0) begin
             leds_c = 10'h0;
          end
+			seconds_played_c = leds_c;
 			// Tell the player "YAYY"
 			cell0 = 8'b10010001;
 			cell1 = 8'b10010001;
@@ -706,6 +713,7 @@ module Amazer(
 	  cell_west_reg <= cell_west_c;
 		do_push <= do_push_c;
 		player_cell_reg <= player_cell_c;
+		seconds_played <= seconds_played_c;
    end // always @ (posedge clk)
 
    assign mem_wren = mem_wren_reg;
@@ -750,7 +758,7 @@ module Amazer(
    display dd3(cell3, d3);
    
    assign LEDR = leds;
-   assign LEDG = leds[7:0];
+   assign LEDG = seconds_played;
    
    assign CLK = CLOCK_50_B5B;
    //assign CLK = KEY[0];
